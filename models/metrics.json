@@ -1,0 +1,528 @@
+{
+  "model": {
+    "version": "2026.09.16-1808",
+    "trained_at": "2026-09-16T18:08:57+00:00",
+    "temperature": 0.9,
+    "threshold": 0.94,
+    "best_iteration": 108,
+    "quick": false
+  },
+  "data": {
+    "train": {
+      "hours": 16.0,
+      "events": 450943,
+      "campaigns": {
+        "intrusion_chain": 10,
+        "credential_stuffing": 8,
+        "c2_exfil": 10,
+        "low_and_slow": 6,
+        "benign_noise": 20
+      },
+      "class_counts": {
+        "benign": 426504,
+        "recon": 2916,
+        "brute_force": 19328,
+        "lateral_movement": 272,
+        "c2_beacon": 1032,
+        "exfiltration": 891
+      }
+    },
+    "val": {
+      "hours": 6.0,
+      "events": 189076,
+      "campaigns": {
+        "intrusion_chain": 4,
+        "credential_stuffing": 3,
+        "c2_exfil": 4,
+        "low_and_slow": 2,
+        "benign_noise": 8
+      },
+      "class_counts": {
+        "benign": 179472,
+        "recon": 1015,
+        "brute_force": 7650,
+        "lateral_movement": 180,
+        "c2_beacon": 406,
+        "exfiltration": 353
+      }
+    },
+    "test": {
+      "hours": 8.0,
+      "events": 251515,
+      "campaigns": {
+        "intrusion_chain": 5,
+        "credential_stuffing": 4,
+        "c2_exfil": 5,
+        "low_and_slow": 3,
+        "benign_noise": 10,
+        "dns_tunnel": 4
+      },
+      "class_counts": {
+        "benign": 213821,
+        "recon": 977,
+        "brute_force": 8764,
+        "lateral_movement": 132,
+        "c2_beacon": 548,
+        "exfiltration": 27273
+      }
+    }
+  },
+  "event_level": {
+    "macro_f1": 0.9747,
+    "per_class": {
+      "benign": {
+        "precision": 0.9992,
+        "recall": 0.9999,
+        "f1-score": 0.9996,
+        "support": 213821.0
+      },
+      "recon": {
+        "precision": 1.0,
+        "recall": 0.8874,
+        "f1-score": 0.9403,
+        "support": 977.0
+      },
+      "brute_force": {
+        "precision": 0.9995,
+        "recall": 0.9957,
+        "f1-score": 0.9976,
+        "support": 8764.0
+      },
+      "lateral_movement": {
+        "precision": 0.9,
+        "recall": 0.9545,
+        "f1-score": 0.9265,
+        "support": 132.0
+      },
+      "c2_beacon": {
+        "precision": 1.0,
+        "recall": 0.9708,
+        "f1-score": 0.9852,
+        "support": 548.0
+      },
+      "exfiltration": {
+        "precision": 1.0,
+        "recall": 0.9976,
+        "f1-score": 0.9988,
+        "support": 425.0
+      }
+    },
+    "confusion_matrix": {
+      "labels": [
+        "benign",
+        "recon",
+        "brute_force",
+        "lateral_movement",
+        "c2_beacon",
+        "exfiltration"
+      ],
+      "matrix": [
+        [
+          213809,
+          0,
+          4,
+          8,
+          0,
+          0
+        ],
+        [
+          110,
+          867,
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          36,
+          0,
+          8726,
+          2,
+          0,
+          0
+        ],
+        [
+          6,
+          0,
+          0,
+          126,
+          0,
+          0
+        ],
+        [
+          12,
+          0,
+          0,
+          4,
+          532,
+          0
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          0,
+          424
+        ]
+      ]
+    },
+    "malicious_precision": 0.9989,
+    "malicious_recall": 0.9848,
+    "malicious_f1": 0.9918,
+    "benign_false_positive_rate": 6e-05,
+    "lookalike_false_positive_rate": 0.0,
+    "ece_uncalibrated": 0.0038,
+    "ece_calibrated": 0.0028
+  },
+  "pipeline": {
+    "hours": 8.0,
+    "events": 251515,
+    "alerts": 90,
+    "false_alerts": 7,
+    "false_alerts_per_hour": 0.88,
+    "alert_precision": 0.922,
+    "events_per_alert": 2795,
+    "incidents": 17,
+    "mixed_incidents": 2,
+    "false_alert_examples": [
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0083",
+        "detector": "supervised",
+        "confidence": 0.99,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0041",
+        "detector": "supervised",
+        "confidence": 1.0,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0019",
+        "detector": "supervised",
+        "confidence": 1.0,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0041",
+        "detector": "supervised",
+        "confidence": 0.96,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0041",
+        "detector": "supervised",
+        "confidence": 0.99,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0050",
+        "detector": "supervised",
+        "confidence": 0.96,
+        "events": 1
+      },
+      {
+        "threat": "lateral_movement",
+        "entity": "ws-0019",
+        "detector": "supervised",
+        "confidence": 0.94,
+        "events": 1
+      }
+    ],
+    "scenarios": {
+      "intrusion_chain": {
+        "runs": 5,
+        "alerts": 55,
+        "detected_runs": 5,
+        "stage_recall": 1.0,
+        "median_time_to_detect_s": 40.3,
+        "runs_with_incident": 5,
+        "detectors": {
+          "supervised": 55
+        }
+      },
+      "credential_stuffing": {
+        "runs": 4,
+        "alerts": 9,
+        "detected_runs": 4,
+        "stage_recall": 1.0,
+        "median_time_to_detect_s": 0.2,
+        "runs_with_incident": 4,
+        "detectors": {
+          "supervised": 9
+        }
+      },
+      "c2_exfil": {
+        "runs": 5,
+        "alerts": 12,
+        "detected_runs": 5,
+        "stage_recall": 1.0,
+        "median_time_to_detect_s": 64.1,
+        "runs_with_incident": 5,
+        "detectors": {
+          "supervised": 12
+        }
+      },
+      "low_and_slow": {
+        "runs": 3,
+        "alerts": 3,
+        "detected_runs": 3,
+        "stage_recall": 1.0,
+        "median_time_to_detect_s": 49.1,
+        "runs_with_incident": 2,
+        "detectors": {
+          "supervised": 3
+        }
+      },
+      "benign_noise": {
+        "runs": 10,
+        "alerts": 0,
+        "detected_runs": null,
+        "stage_recall": null,
+        "median_time_to_detect_s": null,
+        "runs_with_incident": 0,
+        "detectors": {}
+      },
+      "dns_tunnel": {
+        "runs": 4,
+        "alerts": 4,
+        "detected_runs": 4,
+        "stage_recall": 1.0,
+        "median_time_to_detect_s": 0.2,
+        "runs_with_incident": 0,
+        "detectors": {
+          "supervised": 4
+        }
+      }
+    }
+  },
+  "feature_importance": [
+    {
+      "feature": "w_uniq_users",
+      "label": "Distinct accounts used (5 min)",
+      "gain": 0.1953
+    },
+    {
+      "feature": "h_uniq_failed_users",
+      "label": "Distinct accounts with failed logins (1 h)",
+      "gain": 0.1275
+    },
+    {
+      "feature": "dst_prevalence",
+      "label": "Internal hosts that ever contacted destination",
+      "gain": 0.0869
+    },
+    {
+      "feature": "ev_bytes_out",
+      "label": "Bytes sent in this event",
+      "gain": 0.0858
+    },
+    {
+      "feature": "w_uniq_ports",
+      "label": "Distinct destination ports (5 min)",
+      "gain": 0.0705
+    },
+    {
+      "feature": "w_auth_failure_ratio",
+      "label": "Failed share of logins (5 min)",
+      "gain": 0.0493
+    },
+    {
+      "feature": "w_external_ratio",
+      "label": "Share of traffic leaving the network (5 min)",
+      "gain": 0.0465
+    },
+    {
+      "feature": "p_size_cv",
+      "label": "Payload size variation to destination (CV)",
+      "gain": 0.0412
+    },
+    {
+      "feature": "w_suspicious_procs",
+      "label": "Suspicious process launches (5 min)",
+      "gain": 0.0372
+    },
+    {
+      "feature": "w_remote_logons",
+      "label": "Successful logons to non-DC hosts (5 min)",
+      "gain": 0.0342
+    },
+    {
+      "feature": "w_admin_port_ratio",
+      "label": "Share of flows to admin ports (5 min)",
+      "gain": 0.0223
+    },
+    {
+      "feature": "p_count",
+      "label": "Connections to this destination (30 min)",
+      "gain": 0.0215
+    },
+    {
+      "feature": "ev_dst_external",
+      "label": "Destination is outside the network",
+      "gain": 0.021
+    },
+    {
+      "feature": "w_bytes_out",
+      "label": "Bytes sent by source (5 min)",
+      "gain": 0.0193
+    },
+    {
+      "feature": "ev_proc_suspicious",
+      "label": "Suspicious process command line",
+      "gain": 0.0188
+    },
+    {
+      "feature": "w_auth_failures",
+      "label": "Failed logins (5 min)",
+      "gain": 0.0177
+    },
+    {
+      "feature": "w_uniq_dst",
+      "label": "Distinct destinations (5 min)",
+      "gain": 0.0144
+    },
+    {
+      "feature": "w_out_in_skew",
+      "label": "Upload/download skew, log ratio (5 min)",
+      "gain": 0.0127
+    },
+    {
+      "feature": "ev_admin_port",
+      "label": "Targets an admin port (SMB/RDP/SSH/WinRM)",
+      "gain": 0.0126
+    },
+    {
+      "feature": "h_external_bytes_out",
+      "label": "Bytes sent outside the network (1 h)",
+      "gain": 0.0114
+    },
+    {
+      "feature": "ev_duration",
+      "label": "Connection duration",
+      "gain": 0.0102
+    },
+    {
+      "feature": "p_interval_cv",
+      "label": "Timing irregularity to destination (CV)",
+      "gain": 0.0088
+    },
+    {
+      "feature": "src_workstation",
+      "label": "Source is a workstation",
+      "gain": 0.0053
+    },
+    {
+      "feature": "ev_bytes_in",
+      "label": "Bytes received in this event",
+      "gain": 0.0048
+    },
+    {
+      "feature": "w_small_flow_ratio",
+      "label": "Share of tiny probe-like flows (5 min)",
+      "gain": 0.0048
+    },
+    {
+      "feature": "h_auth_failures",
+      "label": "Failed logins (1 h)",
+      "gain": 0.0042
+    },
+    {
+      "feature": "p_interval_mean",
+      "label": "Mean gap between connections to destination",
+      "gain": 0.0031
+    },
+    {
+      "feature": "w_flows",
+      "label": "Network flows from source (5 min)",
+      "gain": 0.0026
+    },
+    {
+      "feature": "w_bytes_in",
+      "label": "Bytes received by source (5 min)",
+      "gain": 0.0019
+    },
+    {
+      "feature": "w_http_4xx_ratio",
+      "label": "HTTP client-error share (5 min)",
+      "gain": 0.0015
+    },
+    {
+      "feature": "src_server",
+      "label": "Source is a server",
+      "gain": 0.0011
+    },
+    {
+      "feature": "ev_auth_failure",
+      "label": "Event is a failed login",
+      "gain": 0.001
+    },
+    {
+      "feature": "src_infra",
+      "label": "Source is sanctioned IT tooling",
+      "gain": 0.001
+    },
+    {
+      "feature": "ev_network",
+      "label": "Event is a network flow",
+      "gain": 0.0009
+    },
+    {
+      "feature": "w_events",
+      "label": "Events from source (5 min)",
+      "gain": 0.0008
+    },
+    {
+      "feature": "w_login_ratio",
+      "label": "Share of requests to login endpoints (5 min)",
+      "gain": 0.0006
+    },
+    {
+      "feature": "ev_login_path",
+      "label": "Request hits a login endpoint",
+      "gain": 0.0005
+    },
+    {
+      "feature": "ev_endpoint",
+      "label": "Event is endpoint telemetry",
+      "gain": 0.0003
+    },
+    {
+      "feature": "w_http",
+      "label": "HTTP requests (5 min)",
+      "gain": 0.0003
+    },
+    {
+      "feature": "off_hours",
+      "label": "Outside business hours",
+      "gain": 0.0002
+    },
+    {
+      "feature": "ev_http_4xx",
+      "label": "HTTP client error",
+      "gain": 0.0001
+    },
+    {
+      "feature": "ev_application",
+      "label": "Event is an application log",
+      "gain": 0.0
+    },
+    {
+      "feature": "w_uniq_paths",
+      "label": "Distinct URL paths (5 min)",
+      "gain": 0.0
+    },
+    {
+      "feature": "src_external",
+      "label": "Source is on the internet",
+      "gain": 0.0
+    }
+  ]
+}

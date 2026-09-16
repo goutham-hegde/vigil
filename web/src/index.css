@@ -1,0 +1,95 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@theme {
+  --font-sans: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+  --color-canvas: #fafaf9;
+  --color-surface: #ffffff;
+  --color-subtle: #f4f4f2;
+  --color-hover: #efefed;
+  --color-line: #e9e9e6;
+  --color-line-strong: #d8d8d4;
+  --color-ink: #0f0f0f;
+  --color-ink-2: #52514e;
+  --color-ink-3: #8a8983;
+  --color-accent: #5b5bd6;
+  --color-accent-soft: #eeeefc;
+
+  /* status palette: always paired with a label or icon */
+  --color-sev-critical: #d03b3b;
+  --color-sev-high: #ec835a;
+  --color-sev-medium: #fab219;
+  --color-sev-low: #a3a29c;
+  --color-good: #0ca30c;
+  --color-good-ink: #006300;
+
+  /* categorical slots 1-3: telemetry layers */
+  --color-net: #2a78d6;
+  --color-end: #eb6834;
+  --color-app: #1baf7a;
+
+  /* chart chrome */
+  --color-grid: #ecebe6;
+  --color-axis: #c3c2b7;
+  --color-shap-pos: #e34948;
+  --color-shap-neg: #2a78d6;
+
+  --shadow-pop: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -6px rgb(0 0 0 / 0.12);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.03);
+
+  --animate-pulse-dot: pulse-dot 1.8s ease-in-out infinite;
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+  }
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+::selection {
+  background: var(--color-accent-soft);
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

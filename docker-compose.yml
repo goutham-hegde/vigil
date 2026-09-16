@@ -1,0 +1,14 @@
+services:
+  vigil:
+    build:
+      context: .
+      args:
+        TRAIN_FLAGS: ${TRAIN_FLAGS:-}
+    ports:
+      - "8710:8710"
+    volumes:
+      - feedback:/app/data
+    restart: unless-stopped
+
+volumes:
+  feedback:

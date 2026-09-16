@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Trained artifacts: rebuild with `python -m vigil.train`
+models/*
+!models/metrics.json
+models_quick/
+
+# Analyst feedback collected at runtime
+data/
+
+# Web
+web/node_modules/
+web/dist/
+
+# Local tooling
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
