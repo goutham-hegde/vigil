@@ -37,17 +37,33 @@ Where the ML upgrade stands, and the exact commands to carry it on. Update this 
   - Not tuned or run on real data yet; sizes and epochs are parameters.
 - Still to do: stacking/fusion (M5), ablations, the error analysis, and the benchmark tab (M6).
 
-**Data**
-- Raw files are in `C:\data\lanl\`: redteam, dns, flows, proc. All pass `gzip -t`.
-- `auth.txt.gz` (7.2 GB) is still downloading.
-- Ingested so far:
-  - redteam: 749 rows.
-  - dns: 40,821,591 rows in 43 s.
-  - flows: 129,977,412 rows in 256 s. Flows covers only 30 of the days, so host-flow features are missing on the other days.
-  - proc: 426,045,096 rows in 674 s (58 days). At about 0.6–0.9 M rows/s, auth (about 1.05 B rows) should take roughly 20–30 min.
+**Data (all ingested, 2026-09-18)**
 
-**Built from the data already present (no auth needed)**
-- Host context features: `feat_first_proc` (1,811,754 rows) and `feat_host_hour` (11,899,674 rows), 77 MB, 3 min.
+| table | rows | days present | load time |
+|---|---:|---|---:|
+| auth | 1,051,430,459 | 0-57 | 38 min |
+| proc | 426,045,096 | 0-57 | 11 min |
+| flows | 129,977,412 | 0-23, 26-29, 36 | 4 min |
+| dns | 40,821,591 | 0-57 (56 days) | 43 s |
+| redteam | 749 | 18 days between 1 and 29 | - |
+
+The five totals sum to 1,648,275,307, exactly the figure LANL publishes for the collection, so nothing was dropped or duplicated. Parquet is 11.6 GB in `C:\data\lanl\parquet` and C: has about 22 GB free.
+
+**What the data card says (`docs/data/LANL_DATA_CARD.md`)**
+- 749 red-team rows, 715 distinct, 104 accounts, 301 destination hosts, only 4 source hosts (C17693, C18025, C19932, C22409).
+- 700 rows match exactly one auth event, 1 matches duplicates, 14 match none: **702 labelled events out of 1.05 B**, about 1 in 1.5 million.
+- **Every labelled event is NTLM / Network.** Report NTLM's benign base rate alongside any result, so no model gets credit for learning "NTLM".
+- Human (`U...`) logons are 3.8-7.2 M per day; 5-13 k distinct human accounts per day.
+- Flows covers every red-team day, so the multi-layer ablation is possible throughout.
+
+**Splits, fixed in `configs/lanl.yaml`**
+- train days 0-7 (50 red-team rows removed), val days 8-11 (288 red-team events), test days 12-29 (411 red-team events).
+- Days 30-57 are unused: no red-team activity, and no flow sensor for most of them.
+- Day numbering is 0-based; some papers number the same days 1-58.
+
+**Derived tables built** (`data/lanl/lanl/`, gitignored)
+- `auth_edges_hourly`: 58 days of hourly per-edge counts.
+- Features: 459,676 distinct user->host edges, 7.4 M user-hour rows, plus the host context tables.
 
 ## Commands
 
