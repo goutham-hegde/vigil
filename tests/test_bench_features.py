@@ -2,8 +2,10 @@
 
 import copy
 import gzip
+import importlib.util
 
 import numpy as np
+import pyarrow as pa
 import pytest
 from conftest import build_lanl
 
@@ -51,12 +53,21 @@ def test_feature_sql_never_mentions_label():
     assert "label" not in (JOINS + select_list()).lower()
 
 
+# torch is only needed for the sequence model; it is not a runtime dependency of
+# the engine, so CI can run everything else without it.
+requires_torch = pytest.mark.skipif(importlib.util.find_spec("torch") is None, reason="torch is not installed")
+
+
 @pytest.mark.parametrize("experiment,params", [
     ("iforest", {"n_estimators": 50, "max_samples": 256}),
     ("iforest", {"n_estimators": 50, "max_samples": 256, "groups": ["event", "novelty"]}),
     ("gbm_supervised", {"rounds": 30, "min_child_samples": 2}),
+    ("gbm_density_ratio", {"rounds": 30, "min_child_samples": 5}),
+    ("graph_embed", {"dim": 8}),
+    pytest.param("sequence_gru", {"hidden": 16, "layers": 1, "window": 8, "epochs": 1, "batch": 16,
+                                  "max_users": 50}, marks=requires_torch),
 ])
-def test_tabular_models_run(lanl_fixture, tmp_path, experiment, params):
+def test_models_run(lanl_fixture, tmp_path, experiment, params):
     _, cfg = lanl_fixture
     cfg = copy.deepcopy(cfg)
     cfg["data"]["splits"]["train"] = [0, 4]  # the supervised model needs red-team days to learn from
@@ -75,3 +86,41 @@ def test_unknown_feature_group_is_rejected():
     with pytest.raises(ValueError, match="unknown feature groups"):
         IForest({"groups": ["nope"]})
     assert "novelty" in GROUPS
+
+
+@pytest.fixture(scope="module")
+def fitted_gru(lanl_fixture, tmp_path_factory):
+    """A tiny trained sequence model, plus a context to score with."""
+    pytest.importorskip("torch")
+    from vigil.bench.experiment import Context
+    from vigil.models.sequence import SequenceGRU
+
+    _, cfg = lanl_fixture
+    cfg = copy.deepcopy(cfg)
+    cfg["data"]["splits"]["train"] = [0, 4]
+    _, pqd, derived = lanl.data_paths(cfg)
+    ctx = Context(cfg, lanl.connect(pqd, derived=derived), tmp_path_factory.mktemp("gru"), 0)
+    exp = SequenceGRU({"hidden": 16, "layers": 1, "window": 8, "epochs": 1, "batch": 16, "max_users": 50})
+    exp.fit(ctx)
+    return exp, ctx
+
+
+@requires_torch
+def test_sequence_scores_depend_only_on_the_past(fitted_gru):
+    exp, ctx = fitted_gru
+    sql = lanl.auth_events_sql("human")
+    user = ctx.con.execute(f"SELECT src_user FROM ({sql}) WHERE day = 4 GROUP BY 1 "
+                           "HAVING count(*) > 5 ORDER BY 1 LIMIT 1").fetchone()[0]
+    tbl = ctx.con.execute(f"SELECT * EXCLUDE (label) FROM ({sql}) WHERE day = 4 AND src_user = '{user}' "
+                          "ORDER BY key LIMIT 6").to_arrow_table()
+
+    def score(t):
+        exp.state, exp.last = {}, {}  # same starting point both times
+        return exp.score_batch(ctx, t)
+
+    before = score(tbl)
+    changed = tbl.set_column(tbl.schema.get_field_index("dst_comp"), "dst_comp",
+                             pa.array(tbl["dst_comp"].to_pylist()[:-1] + ["C_ELSEWHERE"]))
+    after = score(changed)
+    np.testing.assert_array_equal(before[:-1], after[:-1])  # earlier events unaffected by a later change
+    assert before[-1] != after[-1]  # the changed event itself does move

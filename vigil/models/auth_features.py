@@ -221,24 +221,43 @@ def _register(con, name: str, path: Path) -> None:
 
 def build_feature_tables(con: duckdb.DuckDBPyConnection, derived: Path, user_filter: str = "human",
                          force: bool = False, log=print) -> None:
-    """Materialise the feature lookup tables under `<derived>/features/` (idempotent)."""
+    """Materialise every feature lookup table under `<derived>/features/` (idempotent)."""
+    build_host_tables(con, derived, force=force, log=log)
+    build_auth_tables(con, derived, user_filter, force=force, log=log)
+
+
+def build_auth_tables(con: duckdb.DuckDBPyConnection, derived: Path, user_filter: str = "human",
+                      force: bool = False, log=print) -> None:
+    """The tables derived from authentications. Needs `auth_edges_hourly`."""
     out = derived / "features"
-    marker = out / "_BUILT.json"
+    marker = out / "_AUTH_BUILT.json"
     if marker.exists() and not force:
-        log("features: already built, skipping")
-        register_feature_tables(con, derived)
+        log("auth features: already built, skipping")
+        _register_dir(con, out)
         return
-    if out.exists():
-        shutil.rmtree(out)
-    present = _views(con)
-    if "auth_edges_hourly" not in present:
-        raise RuntimeError("auth_edges_hourly is missing; build it first")
+    if "auth_edges_hourly" not in _views(con):
+        raise RuntimeError("auth_edges_hourly is missing; run `python -m vigil.data.lanl build` after ingesting auth")
+    out.mkdir(parents=True, exist_ok=True)
     rows = {}
     edges = _edges(user_filter)
     for name, sql in AUTH_TABLES.items():
         rows[name] = _copy(con, sql.format(edges=edges), out / f"{name}.parquet")
         _register(con, name, out / f"{name}.parquet")
         log(f"  {name}: {rows[name]:,} rows")
+    marker.write_text(json.dumps({"rows": rows, "user_filter": user_filter}))
+
+
+def build_host_tables(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print) -> None:
+    """Per-computer hourly context from proc, flows and DNS. Independent of auth, so it can be built first."""
+    out = derived / "features"
+    marker = out / "_HOST_BUILT.json"
+    if marker.exists() and not force:
+        log("host features: already built, skipping")
+        _register_dir(con, out)
+        return
+    out.mkdir(parents=True, exist_ok=True)
+    present = _views(con)
+    rows = {}
     if "proc" in present:
         rows["feat_first_proc"] = _copy(
             con, f"SELECT comp, process, min(time) // {HOUR} AS first_hour FROM proc GROUP BY ALL",
@@ -261,7 +280,7 @@ def build_feature_tables(con: duckdb.DuckDBPyConnection, derived: Path, user_fil
     rows["feat_host_hour"] = _copy(con, host_sql, out / "feat_host_hour.parquet")
     _register(con, "feat_host_hour", out / "feat_host_hour.parquet")
     log(f"  feat_host_hour: {rows['feat_host_hour']:,} rows (sensors: {sorted(present & {'proc', 'flows', 'dns'})})")
-    marker.write_text(json.dumps({"rows": rows, "user_filter": user_filter}))
+    marker.write_text(json.dumps({"rows": rows, "sensors": sorted(present & {"proc", "flows", "dns"})}))
 
 
 def _columns(con, sql: str) -> set[str]:
@@ -270,8 +289,12 @@ def _columns(con, sql: str) -> set[str]:
 
 def register_feature_tables(con: duckdb.DuckDBPyConnection, derived: Path) -> None:
     out = derived / "features"
-    if not (out / "_BUILT.json").exists():
+    if not (out / "_AUTH_BUILT.json").exists():
         raise RuntimeError(f"feature tables not built under {out}; run `python -m vigil.data.lanl build`")
+    _register_dir(con, out)
+
+
+def _register_dir(con: duckdb.DuckDBPyConnection, out: Path) -> None:
     for p in sorted(out.glob("*.parquet")):
         _register(con, p.stem, p)
 

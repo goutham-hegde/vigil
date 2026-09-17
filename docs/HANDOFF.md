@@ -27,7 +27,15 @@ Where the ML upgrade stands, and the exact commands to carry it on. Update this 
   - `iforest`: unsupervised.
   - `gbm_supervised`: trained on training-window red-team labels, and marked † in the report as an upper bound.
   - Both take `groups=[...]` for ablations.
-- Not done yet: the unsupervised GBM variant, and tuning.
+- `vigil/models/gbm.py` also has `gbm_density_ratio`: an unsupervised GBM. Benign training events are class 1, and class 0 is made by shuffling each feature column independently, so the model learns which *combinations* normal activity never produces (ESL 14.2.4). Same features as the supervised model, no labels anywhere.
+
+**Started: M3 and M4-lite**
+- `vigil/models/graph.py` (`graph_embed`): the user-host logon graph, weighted by PPMI, factorised with a truncated SVD. A logon scores high when the user's vector and the host's vector do not match. Fitted on the training window only; minutes of CPU, not hours.
+- `vigil/models/sequence.py` (`sequence_gru`): a per-user event language model (Tuor et al. 2017). A 2-layer GRU reads each user's logon stream and predicts the next event; the score is the negative log-likelihood of what actually happened. One hidden state per user is carried forward in time, and a test proves an event's score cannot be changed by later events.
+  - Needs PyTorch CPU: `.venv/Scripts/pip install --index-url https://download.pytorch.org/whl/cpu torch` (2.14.0+cpu is installed).
+  - torch is not a runtime dependency of the engine, so its tests skip when it is missing and CI stays fast.
+  - Not tuned or run on real data yet; sizes and epochs are parameters.
+- Still to do: stacking/fusion (M5), ablations, the error analysis, and the benchmark tab (M6).
 
 **Data**
 - Raw files are in `C:\data\lanl\`: redteam, dns, flows, proc. All pass `gzip -t`.
@@ -38,18 +46,25 @@ Where the ML upgrade stands, and the exact commands to carry it on. Update this 
   - flows: 129,977,412 rows in 256 s. Flows covers only 30 of the days, so host-flow features are missing on the other days.
   - proc: 426,045,096 rows in 674 s (58 days). At about 0.6–0.9 M rows/s, auth (about 1.05 B rows) should take roughly 20–30 min.
 
+**Built from the data already present (no auth needed)**
+- Host context features: `feat_first_proc` (1,811,754 rows) and `feat_host_hour` (11,899,674 rows), 77 MB, 3 min.
+
 ## Commands
 
 ```bash
 # Ingestion, once per table; skips tables that are already done. Needs about 1 M rows/s.
 .venv/Scripts/python -m vigil.data.lanl ingest --tables auth      # after the download finishes
 .venv/Scripts/python -m vigil.data.lanl profile                   # -> docs/data/LANL_DATA_CARD.md
-.venv/Scripts/python -m vigil.data.lanl build                     # hourly auth edge tables -> data/lanl/lanl/
+.venv/Scripts/python -m vigil.data.lanl build --tables host       # proc/flows/dns context (done, 3 min)
+.venv/Scripts/python -m vigil.data.lanl build                     # + hourly auth edges and auth features
 
 # Benchmarks (needs data.splits set in configs/lanl.yaml)
 .venv/Scripts/python -m vigil.bench run random
 .venv/Scripts/python -m vigil.bench run first_seen_edge
 .venv/Scripts/python -m vigil.bench run iforest
+.venv/Scripts/python -m vigil.bench run gbm_density_ratio                    # unsupervised
+.venv/Scripts/python -m vigil.bench run graph_embed
+.venv/Scripts/python -m vigil.bench run sequence_gru --seed 0                # long; checkpointed and resumable
 .venv/Scripts/python -m vigil.bench run gbm_supervised                       # needs red-team days inside train
 .venv/Scripts/python -m vigil.bench run iforest --set "groups=[event,novelty,history]"   # ablation
 .venv/Scripts/python -m vigil.bench report --data lanl            # -> docs/BENCHMARKS.md, models/benchmarks.json

@@ -71,6 +71,46 @@ class IForest(FeatureModel):
         return -self.model.score_samples(self.matrix(batch))
 
 
+@register("gbm_density_ratio")
+class GBMDensityRatio(FeatureModel):
+    """An unsupervised GBM: no labels anywhere, on training or test.
+
+    Trick from Hastie et al. (ESL 14.2.4). Take the benign training events as
+    class 1, and manufacture class 0 by shuffling each feature column
+    independently, which keeps every marginal but destroys the joint
+    structure. A classifier separating the two learns
+    log p_real(x) / p_independent(x), so a *low* value means a combination of
+    feature values that normal activity does not produce. The anomaly score is
+    the negative of it.
+
+    This is the honest counterpart to `gbm_supervised`: same features, same
+    trees, no knowledge of any attack.
+    """
+
+    def fit(self, ctx: Context) -> None:
+        X = self.matrix(self.sample(ctx, ctx.train_events_sql(), int(self.params.get("train_sample", 1_000_000))))
+        rng = np.random.default_rng(ctx.seed)
+        fake = np.column_stack([rng.permutation(X[:, j]) for j in range(X.shape[1])])
+        data = np.vstack([X, fake])
+        y = np.concatenate([np.ones(len(X)), np.zeros(len(fake))])
+        categorical = [i for i, f in enumerate(self.features) if f.categorical]
+        dset = lgb.Dataset(data, y, feature_name=[f.name for f in self.features],
+                           categorical_feature=categorical, free_raw_data=False)
+        params = {
+            "objective": "binary",
+            "learning_rate": float(self.params.get("learning_rate", 0.1)),
+            "num_leaves": int(self.params.get("num_leaves", 63)),
+            "min_child_samples": int(self.params.get("min_child_samples", 50)),
+            "feature_fraction": 0.8, "bagging_fraction": 0.8, "bagging_freq": 1,
+            "seed": ctx.seed, "deterministic": True, "num_threads": 0, "verbose": -1,
+        }
+        self.booster = lgb.train(params, dset, num_boost_round=int(self.params.get("rounds", 200)))
+        self.booster.save_model(str(ctx.run_dir / "model.txt"))
+
+    def score_batch(self, ctx: Context, batch: pa.Table) -> np.ndarray:
+        return -self.booster.predict(self.matrix(batch), raw_score=True)
+
+
 @register("gbm_supervised")
 class GBMSupervised(FeatureModel):
     supervised = True

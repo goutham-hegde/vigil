@@ -141,6 +141,11 @@ def connect(pq_dir: Path, threads: int | None = None, memory_limit: str = "6GB",
     con = duckdb.connect()
     con.execute(f"SET memory_limit='{memory_limit}'")
     con.execute("SET preserve_insertion_order=false")
+    # Aggregations over the billion-row tables spill to disk; keep that next to
+    # the Parquet (C:), never on the small G: drive.
+    tmp = pq_dir.parent / "duckdb_tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    con.execute(f"SET temp_directory='{tmp.as_posix()}'")
     if threads:
         con.execute(f"SET threads={int(threads)}")
     for t in TABLES:
@@ -157,7 +162,7 @@ def connect(pq_dir: Path, threads: int | None = None, memory_limit: str = "6GB",
         if (edges / "_BUILT.json").exists():
             glob = (edges / "*" / "*.parquet").as_posix()
             con.execute(f"CREATE VIEW auth_edges_hourly AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
-        if (derived / "features" / "_BUILT.json").exists():
+        if (derived / "features" / "_AUTH_BUILT.json").exists():
             from ..models.auth_features import register_feature_tables
             register_feature_tables(con, derived)
     return con
@@ -180,14 +185,18 @@ def auth_events_sql(user_filter: str = "human") -> str:
 # ---------------------------------------------------------------- derived tables
 
 def build_derived(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print,
-                  user_filter: str = "human") -> None:
-    """All derived tables: hourly auth edges, then the model feature tables."""
-    from ..models.auth_features import build_feature_tables
+                  user_filter: str = "human", tables: str = "all") -> None:
+    """Derived tables. `tables` is "host" (proc/flows/dns only, no auth needed), "auth", or "all"."""
+    from ..models.auth_features import build_auth_tables, build_host_tables
 
-    build_edges(con, derived, force=force, log=log)
-    glob = (derived / "auth_edges_hourly" / "*" / "*.parquet").as_posix()
-    con.execute(f"CREATE OR REPLACE VIEW auth_edges_hourly AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
-    build_feature_tables(con, derived, user_filter, force=force, log=log)
+    if tables in ("host", "all"):
+        build_host_tables(con, derived, force=force, log=log)
+    if tables in ("auth", "all"):
+        build_edges(con, derived, force=force, log=log)
+        glob = (derived / "auth_edges_hourly" / "*" / "*.parquet").as_posix()
+        con.execute(
+            f"CREATE OR REPLACE VIEW auth_edges_hourly AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
+        build_auth_tables(con, derived, user_filter, force=force, log=log)
 
 
 def build_edges(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print) -> None:
@@ -363,6 +372,8 @@ def main(argv=None) -> None:
     p_bu = sub.add_parser("build")
     p_bu.add_argument("--config", type=Path, default=REPO / "configs" / "lanl.yaml")
     p_bu.add_argument("--force", action="store_true")
+    p_bu.add_argument("--tables", default="all", choices=("host", "auth", "all"),
+                      help="host needs only proc/flows/dns, so it can run before auth is ingested")
     for p in (p_in, p_pr, p_bu):
         p.add_argument("--raw", type=Path, default=None)
         p.add_argument("--parquet", type=Path, default=None)
@@ -385,7 +396,8 @@ def main(argv=None) -> None:
         args.out.write_text(render_card(prof, data.get("splits")), encoding="utf-8")
         log(f"wrote {args.out}")
     elif args.cmd == "build":
-        build_derived(connect(pqd), derived, force=args.force, log=log, user_filter=data.get("users", "human"))
+        build_derived(connect(pqd), derived, force=args.force, log=log,
+                      user_filter=data.get("users", "human"), tables=args.tables)
 
 
 def data_paths(cfg: dict) -> tuple[Path, Path, Path]:
