@@ -153,9 +153,13 @@ def connect(pq_dir: Path, threads: int | None = None, memory_limit: str = "6GB",
             SELECT DISTINCT time, "user" AS src_user, src_comp, dst_comp FROM redteam
         """)
     if derived is not None:
-        for d in sorted(p for p in derived.glob("*") if p.is_dir() and (p / "_BUILT.json").exists()):
-            glob = (d / "**" / "*.parquet").as_posix()
-            con.execute(f"CREATE VIEW {d.name} AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
+        edges = derived / "auth_edges_hourly"
+        if (edges / "_BUILT.json").exists():
+            glob = (edges / "*" / "*.parquet").as_posix()
+            con.execute(f"CREATE VIEW auth_edges_hourly AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
+        if (derived / "features" / "_BUILT.json").exists():
+            from ..models.auth_features import register_feature_tables
+            register_feature_tables(con, derived)
     return con
 
 
@@ -175,7 +179,18 @@ def auth_events_sql(user_filter: str = "human") -> str:
 
 # ---------------------------------------------------------------- derived tables
 
-def build_derived(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print) -> None:
+def build_derived(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print,
+                  user_filter: str = "human") -> None:
+    """All derived tables: hourly auth edges, then the model feature tables."""
+    from ..models.auth_features import build_feature_tables
+
+    build_edges(con, derived, force=force, log=log)
+    glob = (derived / "auth_edges_hourly" / "*" / "*.parquet").as_posix()
+    con.execute(f"CREATE OR REPLACE VIEW auth_edges_hourly AS SELECT * FROM read_parquet('{glob}', hive_partitioning=true)")
+    build_feature_tables(con, derived, user_filter, force=force, log=log)
+
+
+def build_edges(con: duckdb.DuckDBPyConnection, derived: Path, force: bool = False, log=print) -> None:
     """Hourly per-edge authentication counts over the whole collection.
 
     One row per (hour, user, src, dst, auth type, logon type, orientation,
@@ -370,7 +385,7 @@ def main(argv=None) -> None:
         args.out.write_text(render_card(prof, data.get("splits")), encoding="utf-8")
         log(f"wrote {args.out}")
     elif args.cmd == "build":
-        build_derived(connect(pqd), derived, force=args.force, log=log)
+        build_derived(connect(pqd), derived, force=args.force, log=log, user_filter=data.get("users", "human"))
 
 
 def data_paths(cfg: dict) -> tuple[Path, Path, Path]:

@@ -5,28 +5,21 @@ import gzip
 
 import numpy as np
 import pytest
-import yaml
 
 from vigil import models  # noqa: F401  (registers the experiments)
 from vigil.bench import report, runner
 from vigil.bench.experiment import Context, Experiment, register
 from vigil.data import lanl
-from vigil.data.fixture import write_fixture
 
 
 @pytest.fixture(scope="module")
-def root(tmp_path_factory):
-    return tmp_path_factory.mktemp("lanl")
+def root(lanl_fixture):
+    return lanl_fixture[0]
 
 
 @pytest.fixture(scope="module")
-def cfg(root):
-    raw = write_fixture(root / "raw")
-    c = yaml.safe_load((lanl.REPO / "configs" / "fixture.yaml").read_text())
-    c["data"].update(raw=str(raw), parquet=str(root / "parquet"), derived=str(root / "derived"))
-    lanl.ingest(lanl.TABLES, raw, root / "parquet", log=lambda m: None)
-    lanl.build_derived(lanl.connect(root / "parquet"), root / "derived", log=lambda m: None)
-    return c
+def cfg(lanl_fixture):
+    return lanl_fixture[1]
 
 
 def _con(cfg):

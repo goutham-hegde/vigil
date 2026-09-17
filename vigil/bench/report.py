@@ -40,6 +40,7 @@ def collect(data: str, runs_dir: Path = RUNS) -> dict:
     for (exp, params), runs in sorted(groups.items()):
         runs.sort(key=lambda r: r["seed"])
         entry = {"experiment": exp, "params": json.loads(params), "seeds": [r["seed"] for r in runs],
+                 "supervised": bool(runs[0]["meta"].get("supervised")),
                  "runs": [r["run"] for r in runs], "splits": {}}
         for split in runs[0]["metrics"]:
             first = runs[0]["metrics"][split]
@@ -82,10 +83,14 @@ def render(bench: dict) -> str:
               "|---|---:|" + "---:|" * len(COLUMNS)]
         rows.sort(key=lambda e: -e["splits"][split]["metrics"]["ap"]["mean"])
         for e in rows:
-            name = e["experiment"] + (f" `{json.dumps(e['params'])}`" if e["params"] else "")
+            name = e["experiment"] + (" †" if e["supervised"] else "")
+            name += f" `{json.dumps(e['params'])}`" if e["params"] else ""
             cells = [_cell(e["splits"][split]["metrics"][k]) for k, _ in COLUMNS]
             L.append(f"| {name} | {len(e['seeds'])} | " + " | ".join(cells) + " |")
         L.append("")
+    if any(e["supervised"] for e in bench["experiments"]):
+        L += ["† Supervised: trained on red-team labels from the training window. This is an upper bound; a "
+              "deployment facing a new intrusion has no such labels.", ""]
     L += ["## Published results on LANL", ""]
     if bench["published"]:
         L += ["Protocols differ between papers and from this benchmark; each row notes how. These are context, "

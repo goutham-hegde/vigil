@@ -1,3 +1,3 @@
 """Benchmark models. Importing this package registers them with `vigil.bench`."""
 
-from . import baselines  # noqa: F401
+from . import baselines, gbm  # noqa: F401

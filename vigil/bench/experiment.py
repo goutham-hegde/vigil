@@ -6,7 +6,8 @@ and scores authentication events in one of two ways:
 * `score_sql(ctx)` returns `(joins, expression)`: SQL evaluated per event over
   the alias `e`. Heuristics use this, because it stays inside DuckDB.
 * `score_batch(ctx, batch)` receives Arrow batches in time order, one day at a
-  time, and returns one score per row. Stateful models use this.
+  time, and returns one score per row. Stateful models use this, and
+  `batch_columns(ctx)` can add SQL-computed columns (features) to each batch.
 
 Either way the model never receives the label. The runner attaches the label
 to the scores itself, rejects SQL that mentions it, and removes the column
@@ -63,6 +64,11 @@ class Context:
         """All scorable events, with the label column (runner use only)."""
         return auth_events_sql(self.user_filter)
 
+    def train_labeled_sql(self, split: str = "train") -> str:
+        """Events of a split *with* labels. Only for experiments marked `supervised`, which the report flags."""
+        a, b = self.splits[split]
+        return f"SELECT * FROM ({self.events_sql()}) WHERE day >= {a} AND day < {b}"
+
     def train_events_sql(self) -> str:
         """Training-window events with known red-team events removed; no label column."""
         a, b = self.splits["train"]
@@ -75,6 +81,7 @@ class Context:
 
 class Experiment:
     name: ClassVar[str] = ""
+    supervised: ClassVar[bool] = False  # trained on earlier red-team labels (an upper bound, reported as such)
 
     def __init__(self, params: dict | None = None):
         self.params = params or {}
@@ -83,6 +90,10 @@ class Experiment:
         """Fit on the training window. Must not use labels."""
 
     def score_sql(self, ctx: Context) -> tuple[str, str] | None:
+        return None
+
+    def batch_columns(self, ctx: Context) -> tuple[str, str] | None:
+        """Optional `(joins, select list)` over alias `e`, added to every batch passed to `score_batch`."""
         return None
 
     def score_batch(self, ctx: Context, batch: pa.Table) -> np.ndarray:

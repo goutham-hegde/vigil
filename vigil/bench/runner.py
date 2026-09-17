@@ -106,9 +106,13 @@ def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int) -> N
         for batch in reader:
             sink.add(batch["key"], batch["score"], batch["label"], batch["day"], batch["cluster"])
         return
+    joins, extra = exp.batch_columns(ctx) or ("", "")
+    if _LABEL.search(joins) or _LABEL.search(extra):
+        raise ValueError(f"{exp.name}: batch SQL must not reference the label")
+    extra = f", {extra}" if extra else ""
     for day in range(a, b):
         reader = ctx.con.execute(
-            f"SELECT *, hash(src_user) AS cluster FROM ({base}) WHERE day = {day} ORDER BY key"
+            f"SELECT e.*, hash(e.src_user) AS cluster {extra} FROM ({base}) e {joins} WHERE e.day = {day} ORDER BY e.key"
         ).to_arrow_reader(1 << 18)
         for batch in reader:
             tbl = pa.Table.from_batches([batch])
@@ -138,6 +142,7 @@ def run(experiment: str, cfg: dict, params: dict | None = None, seed: int | None
     (run_dir / "config.yaml").write_text(yaml.safe_dump({**cfg, "experiment": experiment, "params": params,
                                                           "seed": seed}, sort_keys=False))
     meta = {"experiment": experiment, "data": cfg["name"], "seed": seed, "git": git_sha(),
+            "supervised": EXPERIMENTS[experiment].supervised,
             "python": platform.python_version(), "duckdb": duckdb.__version__, "numpy": np.__version__,
             "host": platform.node(), "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "power": power_status()}
 
