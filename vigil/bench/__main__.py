@@ -31,6 +31,8 @@ def main(argv=None) -> None:
     r.add_argument("--force-power", action="store_true", help="start even on low battery")
     p = sub.add_parser("report")
     p.add_argument("--data", default="lanl")
+    c = sub.add_parser("recompute", help="re-evaluate finished runs from their score files")
+    c.add_argument("--data", default="lanl")
     args = ap.parse_args(argv)
 
     if args.cmd == "run":
@@ -39,6 +41,13 @@ def main(argv=None) -> None:
         params = {k: _value(v) for k, v in params.items()}
         out = runner.run(args.experiment, cfg, params, args.seed, force=args.force, force_power=args.force_power)
         print(out)
+    elif args.cmd == "recompute":
+        for d in sorted(runner.RUNS.glob("*/metrics.json")):
+            cfg = yaml.safe_load((d.parent / "config.yaml").read_text())
+            if cfg["name"] == args.data:
+                runner.recompute(d.parent)
+                print(f"recomputed {d.parent.name}")
+        report.write(args.data)
     else:
         bench = report.write(args.data)
         print(f"{len(bench['experiments'])} experiments reported")

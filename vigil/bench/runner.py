@@ -125,6 +125,31 @@ def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int) -> N
             sink.add(tbl["key"].to_numpy(), scores, label, tbl["day"].to_numpy(), cluster)
 
 
+def recompute(run_dir: Path) -> dict:
+    """Re-evaluate a finished run from its score files, without scoring anything again.
+
+    Used when a metric definition changes: the scores are the expensive part and
+    they do not depend on how they are summarised.
+    """
+    import pyarrow.parquet as pq
+
+    cfg = yaml.safe_load((run_dir / "config.yaml").read_text())
+    results = json.loads((run_dir / "metrics.json").read_text())
+    ev = cfg["eval"]
+    for split in list(results):
+        path = run_dir / f"scores_{split}.parquet"
+        if not path.exists():
+            continue
+        t = pq.read_table(path)
+        res = evaluate(t["label"].to_numpy(), t["score"].to_numpy(), t["weight"].to_numpy(),
+                       t["day"].to_numpy(), t["cluster"].to_numpy() if ev.get("cluster") else None,
+                       n_boot=ev.get("n_boot", 500), seed=cfg.get("seed", 0))
+        res.update({k: results[split][k] for k in ("events_scored", "days", "seconds") if k in results[split]})
+        results[split] = res
+    (run_dir / "metrics.json").write_text(json.dumps(results, indent=1))
+    return results
+
+
 def run(experiment: str, cfg: dict, params: dict | None = None, seed: int | None = None, force: bool = False,
         force_power: bool = False, runs_dir: Path = RUNS) -> Path:
     if experiment not in EXPERIMENTS:

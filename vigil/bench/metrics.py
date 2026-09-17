@@ -27,12 +27,22 @@ FPRS = (1e-3, 1e-4)
 
 @dataclass(slots=True)
 class Ranked:
-    """Rows sorted by descending score, with tied scores marked."""
+    """Rows sorted by descending score, with everything weight-independent precomputed.
+
+    The bootstrap re-runs every metric hundreds of times with new weights but the
+    same rows, so the sort order, the tie boundaries and the per-day grouping are
+    computed once here. Each draw is then a handful of cumulative sums.
+    """
 
     y: np.ndarray  # bool
     w: np.ndarray  # float
     day: np.ndarray  # int
     last_of_tie: np.ndarray  # bool: True where the next row has a lower score
+    day_order: np.ndarray  # groups rows by day, keeping the score order within each day
+    day_first: np.ndarray  # index of the first row of each row's day, in day_order space
+    y_by_day: np.ndarray  # y[day_order], cached
+    tie_starts: np.ndarray  # start index of each (day, score) tie group, in day_order space
+    tie_day_first: np.ndarray  # day_first at each tie group's start
 
     @classmethod
     def build(cls, y, score, weight=None, day=None) -> Ranked:
@@ -43,7 +53,18 @@ class Ranked:
         last[:-1] = s[:-1] != s[1:]
         w = np.ones(len(s)) if weight is None else np.asarray(weight, dtype=float)[order]
         d = np.zeros(len(s), dtype=np.int64) if day is None else np.asarray(day)[order]
-        return cls(np.asarray(y, dtype=bool)[order], w, d, last)
+        y = np.asarray(y, dtype=bool)[order]
+        day_order = np.argsort(d, kind="stable")
+        sorted_days = d[day_order]
+        day_first = np.searchsorted(sorted_days, sorted_days, side="left")
+        # Tie groups: same day and same score. A coarse scorer puts thousands of
+        # events on one score, and which of them an analyst would see first is
+        # not decided by the model, so the budget metric averages over that.
+        by_day_score = s[day_order]
+        new_group = np.ones(len(day_order), dtype=bool)
+        new_group[1:] = (sorted_days[1:] != sorted_days[:-1]) | (by_day_score[1:] != by_day_score[:-1])
+        tie_starts = np.flatnonzero(new_group)
+        return cls(y, w, d, last, day_order, day_first, y[day_order], tie_starts, day_first[tie_starts])
 
 
 def _curve(r: Ranked, w: np.ndarray):
@@ -54,8 +75,10 @@ def _curve(r: Ranked, w: np.ndarray):
 
 
 def average_precision(r: Ranked, w: np.ndarray | None = None) -> float:
-    w = r.w if w is None else w
-    tp, fp = _curve(r, w)
+    return _ap(*_curve(r, r.w if w is None else w))
+
+
+def _ap(tp: np.ndarray, fp: np.ndarray) -> float:
     if tp[-1] <= 0:
         return float("nan")
     precision = tp / np.maximum(tp + fp, 1e-300)
@@ -64,8 +87,10 @@ def average_precision(r: Ranked, w: np.ndarray | None = None) -> float:
 
 
 def roc_auc(r: Ranked, w: np.ndarray | None = None) -> float:
-    w = r.w if w is None else w
-    tp, fp = _curve(r, w)
+    return _auc(*_curve(r, r.w if w is None else w))
+
+
+def _auc(tp: np.ndarray, fp: np.ndarray) -> float:
     if tp[-1] <= 0 or fp[-1] <= 0:
         return float("nan")
     tpr = np.concatenate([[0.0], tp / tp[-1]])
@@ -75,8 +100,10 @@ def roc_auc(r: Ranked, w: np.ndarray | None = None) -> float:
 
 def tpr_at_fpr(r: Ranked, target: float, w: np.ndarray | None = None) -> float:
     """Highest TPR among thresholds whose FPR does not exceed `target`."""
-    w = r.w if w is None else w
-    tp, fp = _curve(r, w)
+    return _tpr_at_fpr(*_curve(r, r.w if w is None else w), target)
+
+
+def _tpr_at_fpr(tp: np.ndarray, fp: np.ndarray, target: float) -> float:
     if tp[-1] <= 0 or fp[-1] <= 0:
         return float("nan")
     ok = fp / fp[-1] <= target
@@ -93,29 +120,38 @@ def precision_at_k(r: Ranked, k: int, w: np.ndarray | None = None) -> float:
 
 
 def recall_at_budget(r: Ranked, per_day: int, w: np.ndarray | None = None) -> float:
-    """Share of positive weight inside each day's top `per_day` alerts.
+    """Expected share of positive weight inside each day's top `per_day` alerts.
 
-    This is the SOC view: an analyst team works a fixed number of alerts a day.
-    A row is alerted when the weight ranked above it on its day, itself
-    included, fits in the budget. Ties are broken by input order.
+    This is the SOC view: a team works a fixed number of alerts a day, highest
+    score first. Events tied on the same score are in no model-determined
+    order, so when a tie group straddles the budget the metric takes the
+    expectation over random orderings within it: the group contributes the
+    fraction of itself that fits. A coarse scorer that puts 5,000 events on one
+    score and has 100 slots therefore gets credit for 100/5,000 of the
+    positives in that group, rather than all or none depending on row order.
     """
     w = r.w if w is None else w
     pos_total = w[r.y].sum()
     if pos_total <= 0:
         return float("nan")
-    order = np.argsort(r.day, kind="stable")  # stable keeps the score order within a day
-    d, ww = r.day[order], w[order]
+    ww = w[r.day_order]
     cw = np.cumsum(ww)
-    starts = np.searchsorted(d, d, side="left")
-    before = np.where(starts > 0, cw[np.maximum(starts - 1, 0)], 0.0)
-    alerted = (cw - before) <= per_day
-    return float(ww[alerted & r.y[order]].sum() / pos_total)
+    starts = r.tie_starts
+    group_w = np.add.reduceat(ww, starts)
+    pos_w = np.add.reduceat(np.where(r.y_by_day, ww, 0.0), starts)
+    day_before = np.where(r.tie_day_first > 0, cw[np.maximum(r.tie_day_first - 1, 0)], 0.0)
+    before_group = cw[starts] - ww[starts] - day_before  # weight ranked above this group, within its day
+    share = np.clip((per_day - before_group) / np.maximum(group_w, 1e-300), 0.0, 1.0)
+    return float(np.sum(share * pos_w) / pos_total)
 
 
 def point_metrics(r: Ranked, w: np.ndarray | None = None) -> dict[str, float]:
-    out = {"ap": average_precision(r, w), "roc_auc": roc_auc(r, w)}
+    """Every metric from one pass over the data: the curve is shared, not recomputed per metric."""
+    w = r.w if w is None else w
+    tp, fp = _curve(r, w)
+    out = {"ap": _ap(tp, fp), "roc_auc": _auc(tp, fp)}
     for f in FPRS:
-        out[f"tpr@fpr={f:g}"] = tpr_at_fpr(r, f, w)
+        out[f"tpr@fpr={f:g}"] = _tpr_at_fpr(tp, fp, f)
     for b in BUDGETS:
         out[f"recall@{b}/day"] = recall_at_budget(r, b, w)
     return out

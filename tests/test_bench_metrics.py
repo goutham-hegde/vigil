@@ -35,6 +35,20 @@ def test_recall_at_budget_counts_each_day_separately():
     assert recall_at_budget(r, 4) == pytest.approx(1.0)
 
 
+def test_recall_at_budget_averages_over_ties():
+    """A coarse scorer gets the fraction of a tied group that fits the budget, not all or none."""
+    y = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0], dtype=bool)
+    s = np.ones(10)  # everything tied on one score
+    r = Ranked.build(y, s, day=np.zeros(10, dtype=int))
+    assert recall_at_budget(r, 5) == pytest.approx(0.5)  # 5 of 10 slots -> half the positives
+    assert recall_at_budget(r, 10) == pytest.approx(1.0)
+    assert recall_at_budget(r, 0) == pytest.approx(0.0)
+    # Row order within the tie must not matter.
+    order = np.array([5, 1, 9, 0, 3, 2, 8, 6, 4, 7])
+    shuffled = Ranked.build(y[order], s, day=np.zeros(10, dtype=int))
+    assert recall_at_budget(shuffled, 5) == pytest.approx(0.5)
+
+
 def test_random_scores_give_chance_level():
     rng = np.random.default_rng(1)
     y = rng.random(200_000) < 0.01
