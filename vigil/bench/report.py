@@ -102,6 +102,44 @@ def render(bench: dict) -> str:
     return "\n".join(L) + "\n"
 
 
+README_START = "<!-- LANL:START -->"
+README_END = "<!-- LANL:END -->"
+HEADLINE = [("ap", "AP"), ("recall@100/day", "Recall @100 alerts/day"), ("roc_auc", "ROC-AUC")]
+
+
+def render_readme(bench: dict, split: str = "test") -> str:
+    """The short headline table for the README, generated so it cannot drift from the runs."""
+    rows = [e for e in bench["experiments"] if split in e["splits"]]
+    if not rows:
+        return "No completed runs yet."
+    ref = rows[0]["splits"][split]
+    rows.sort(key=lambda e: -e["splits"][split]["metrics"]["ap"]["mean"])
+    L = [f"Test window: days {ref['days'][0]}–{ref['days'][1] - 1}, "
+         f"{ref['n_positive']} labelled red-team logons among {ref['events_scored']:,} scored authentications "
+         f"(about 1 in {ref['events_scored'] // max(ref['n_positive'], 1):,}).", "",
+         "| Model | " + " | ".join(c for _, c in HEADLINE) + " |", "|---|---:|---:|---:|"]
+    for e in rows:
+        name = e["experiment"] + (" †" if e["supervised"] else "")
+        L.append(f"| {name} | " + " | ".join(_cell(e["splits"][split]["metrics"][k]) for k, _ in HEADLINE) + " |")
+    L += ["", "Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because published work does, but "
+              "at this class imbalance it flatters everything: read AP and the alert-budget recall.",
+          "", f"Full tables, ablations and published-baseline comparisons: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)."]
+    if any(e["supervised"] for e in rows):
+        L += ["", "† Trained on red-team labels from an earlier window: an upper bound, not a deployable result."]
+    return "\n".join(L)
+
+
+def update_readme(bench: dict, readme: Path | None = None) -> bool:
+    readme = readme or REPO / "README.md"
+    text = readme.read_text(encoding="utf-8")
+    if README_START not in text or README_END not in text:
+        return False
+    head, rest = text.split(README_START, 1)
+    _, tail = rest.split(README_END, 1)
+    readme.write_text(f"{head}{README_START}\n{render_readme(bench)}\n{README_END}{tail}", encoding="utf-8")
+    return True
+
+
 def write(data: str, runs_dir: Path = RUNS, docs: Path | None = None, out_json: Path | None = None) -> dict:
     bench = collect(data, runs_dir)
     if data == "lanl":  # the published benchmark; anything else (the fixture) stays under runs/
@@ -114,4 +152,6 @@ def write(data: str, runs_dir: Path = RUNS, docs: Path | None = None, out_json: 
     out_json.parent.mkdir(parents=True, exist_ok=True)
     docs.write_text(render(bench), encoding="utf-8")
     out_json.write_text(json.dumps(bench, indent=1))
+    if data == "lanl":
+        update_readme(bench)
     return bench

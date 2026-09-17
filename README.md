@@ -58,7 +58,18 @@ different seeds, attackers, victims, rates and times of day. Splitting one run's
 near-identical neighbours of each attack into the test set. DNS tunnelling is never shown to the classifier; it
 exists only in the test run, to check generalisation.
 
-## Results
+## Results on real data
+
+Vigil's detectors are benchmarked on LANL's *Comprehensive, Multi-Source Cyber-Security Events*: 58 days of real
+enterprise logs, 1.65 billion events, with a documented red-team campaign as ground truth. Training uses earlier
+days only, and the numbers below come from [`models/benchmarks.json`](models/benchmarks.json) via
+`python -m vigil.bench report`; none of them is typed by hand.
+
+<!-- LANL:START -->
+Not generated yet: run `python -m vigil.bench report --data lanl`.
+<!-- LANL:END -->
+
+## Results on the simulator
 
 Held-out test run: 8 simulated hours, 251,515 events, 31 campaigns.
 

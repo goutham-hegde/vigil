@@ -110,3 +110,28 @@ def test_benchmark_end_to_end(cfg, tmp_path):
     for d in dirs.values():
         assert {"config.yaml", "meta.json", "metrics.json", "scores_val.parquet", "scores_test.parquet"} <= {
             p.name for p in d.iterdir()}
+
+
+def test_readme_table_is_generated_from_runs(cfg, tmp_path):
+    """README numbers come from the run files, never from hand editing."""
+    from vigil.bench import report
+
+    for e in ("random", "first_seen_edge"):
+        runner.run(e, cfg, runs_dir=tmp_path, force_power=True)
+    bench = report.collect(cfg["name"], runs_dir=tmp_path)
+    table = report.render_readme(bench)
+    assert "| first_seen_edge |" in table and "| random |" in table
+    assert "red-team logons among" in table
+
+    readme = tmp_path / "README.md"
+    readme.write_text(f"before\n{report.README_START}\nplaceholder\n{report.README_END}\nafter\n", encoding="utf-8")
+    assert report.update_readme(bench, readme)
+    written = readme.read_text(encoding="utf-8")
+    assert "placeholder" not in written
+    assert written.startswith("before") and written.rstrip().endswith("after")
+
+    # A README without the markers is left alone rather than mangled.
+    plain = tmp_path / "plain.md"
+    plain.write_text("no markers here\n", encoding="utf-8")
+    assert not report.update_readme(bench, plain)
+    assert plain.read_text(encoding="utf-8") == "no markers here\n"
