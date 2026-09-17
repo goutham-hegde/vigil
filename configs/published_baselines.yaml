@@ -1,0 +1,49 @@
+# Published results on the LANL 2015 dataset, for context only.
+#
+# Every figure here was read from the paper itself, not from a summary, and each
+# row states how that paper's protocol differs from this benchmark. The
+# protocols differ enough that none of these is a head-to-head comparison, and
+# the report says so.
+#
+# Checked on 2026-09-18.
+
+- work: "Tuor et al. 2017, arXiv:1712.00557"
+  metric: "ROC-AUC"
+  value: "0.98"
+  notes: >-
+    Event-level (log line) red-team detection with a character-based RNN language model, the same
+    granularity as this benchmark. Trained online over the stream rather than on a fixed earlier
+    window, and reports ROC-AUC without average precision, which flatters any model at this class
+    imbalance. Their comparisons are against Isolation Forest and PCA.
+
+- work: "Euler (King & Huang), NDSS 2022, Table VI, GCN+GRU"
+  metric: "ROC-AUC / AP / TPR at FPR"
+  value: "0.9912 / 0.0523 / 86.10% at 0.5698%"
+  notes: >-
+    Edge-level link detection on hourly graph snapshots, not per-event scoring, so the positives
+    and negatives being counted are different objects. Trained on all snapshots before the first
+    red-team edge (roughly the first two days), where this benchmark trains on days 0-7. Note the
+    AP of 0.05 next to an AUC of 0.99: the same gap this report warns about.
+
+- work: "Euler (King & Huang), NDSS 2022, Table VI, SAGE+GRU"
+  metric: "ROC-AUC / AP / TPR at FPR"
+  value: "0.9847 / 0.0200 / 86.30% at 1.6542%"
+  notes: >-
+    Their best link *prediction* configuration. The prediction test scores each true edge against
+    an equal number of randomly sampled negative edges, so its base rate is nothing like a real
+    event stream, where positives are about 1 in 1.5 million.
+
+- work: "Unknown Authentication rule, as reported in Euler Table VI"
+  metric: "TPR at FPR"
+  value: "72.00% at 4.400%"
+  notes: >-
+    Flags any edge absent from the training data: the same idea as this benchmark's
+    `first_seen_edge` baseline, and the most directly comparable row here, though still edge-level
+    rather than per-event.
+
+- work: "Bowman et al., cited as GL-GV in Euler Table VI"
+  metric: "TPR at FPR"
+  value: "85.00% at 0.900%"
+  notes: >-
+    Graph-learning baseline reported by Euler rather than measured here; edge-level, and the
+    training window is the pre-attack period.
