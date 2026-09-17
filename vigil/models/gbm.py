@@ -105,7 +105,7 @@ class GBMDensityRatio(FeatureModel):
             "seed": ctx.seed, "deterministic": True, "num_threads": 0, "verbose": -1,
         }
         self.booster = lgb.train(params, dset, num_boost_round=int(self.params.get("rounds", 200)))
-        self.booster.save_model(str(ctx.run_dir / "model.txt"))
+        self.booster.save_model(str(ctx.run_dir / f"{self.name}.txt"))
 
     def score_batch(self, ctx: Context, batch: pa.Table) -> np.ndarray:
         return -self.booster.predict(self.matrix(batch), raw_score=True)
@@ -135,7 +135,7 @@ class GBMSupervised(FeatureModel):
             "seed": ctx.seed, "deterministic": True, "num_threads": 0, "verbose": -1,
         }
         self.booster = lgb.train(params, data, num_boost_round=int(self.params.get("rounds", 300)))
-        self.booster.save_model(str(ctx.run_dir / "model.txt"))
+        self.booster.save_model(str(ctx.run_dir / f"{self.name}.txt"))
 
     def score_batch(self, ctx: Context, batch: pa.Table) -> np.ndarray:
         return self.booster.predict(self.matrix(batch), raw_score=True)
