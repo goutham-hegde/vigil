@@ -1,0 +1,16 @@
+# LANL multi-source benchmark. Paths default to C:/data/lanl (raw .gz) and
+# C:/data/lanl/parquet; derived tables go to data/lanl/<name> (gitignored).
+name: lanl
+data:
+  raw: C:/data/lanl
+  parquet: null
+  derived: null
+  users: human          # score human (U...) authentications; see USER_FILTERS
+  splits: null          # half-open day ranges, fixed from the data card before any modelling
+eval:
+  splits: [val, test]
+  per_day_top: 2000     # exact scores kept per day (covers every alert budget reported)
+  sample_rate: 0.01     # hash sample of the remaining benign events, weighted 1/rate
+  cluster: user         # bootstrap unit
+  n_boot: 500
+seed: 0

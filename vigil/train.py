@@ -27,6 +27,7 @@ import numpy as np
 from sklearn.ensemble import IsolationForest
 from sklearn.metrics import classification_report, confusion_matrix, f1_score, precision_recall_fscore_support
 
+from .bench.metrics import expected_calibration_error, fit_temperature, pick_threshold
 from .detection import DetectionEngine
 from .environment import Environment
 from .features import FEATURE_NAMES, FEATURES, FeatureExtractor
@@ -102,44 +103,6 @@ def sample_weights(split: Split) -> np.ndarray:
     lookalike = np.array([e.lookalike for e in split.events])
     w[lookalike] *= 3.0  # hard negatives matter most for alert fatigue
     return w
-
-
-def fit_temperature(raw: np.ndarray, y: np.ndarray) -> float:
-    best_t, best_nll = 1.0, np.inf
-    for t in np.linspace(0.4, 4.0, 37):
-        p = softmax(raw / t)
-        nll = -np.mean(np.log(p[np.arange(len(y)), y] + 1e-12))
-        if nll < best_nll:
-            best_t, best_nll = float(t), nll
-    return best_t
-
-
-def expected_calibration_error(probs: np.ndarray, y: np.ndarray, bins: int = 15) -> float:
-    conf = probs.max(axis=1)
-    correct = probs.argmax(axis=1) == y
-    ece = 0.0
-    edges = np.linspace(0, 1, bins + 1)
-    for lo, hi in zip(edges[:-1], edges[1:]):
-        m = (conf > lo) & (conf <= hi)
-        if m.any():
-            ece += m.mean() * abs(conf[m].mean() - correct[m].mean())
-    return float(ece)
-
-
-def pick_threshold(p_mal: np.ndarray, is_mal: np.ndarray, beta: float = 0.5) -> float:
-    """Threshold on P(malicious) maximising F-beta; beta < 1 favours precision."""
-    best, best_score = 0.5, -1.0
-    for t in np.linspace(0.2, 0.97, 78):
-        pred = p_mal >= t
-        tp = np.sum(pred & is_mal)
-        if tp == 0:
-            continue
-        prec = tp / pred.sum()
-        rec = tp / is_mal.sum()
-        score = (1 + beta**2) * prec * rec / (beta**2 * prec + rec)
-        if score > best_score:
-            best, best_score = float(t), score
-    return best
 
 
 def replay(detector: Detector, env: Environment, split: Split, batch: int = 512) -> DetectionEngine:

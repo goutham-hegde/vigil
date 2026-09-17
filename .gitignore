@@ -10,7 +10,7 @@ models/*
 models_quick/
 
 # Analyst feedback collected at runtime
-data/
+/data/
 
 # Web
 web/node_modules/
@@ -21,3 +21,7 @@ web/dist/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Benchmark runs and LANL data (never commit the data)
+runs/
+*.gz

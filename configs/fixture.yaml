@@ -1,0 +1,19 @@
+# The tiny generated dataset (python -m vigil.data.fixture). Used by tests and CI;
+# its numbers mean nothing.
+name: fixture
+data:
+  raw: data/lanl_fixture/raw
+  parquet: data/lanl_fixture/parquet
+  derived: data/lanl_fixture/derived
+  users: human
+  splits:
+    train: [0, 2]
+    val: [2, 4]
+    test: [4, 6]
+eval:
+  splits: [val, test]
+  per_day_top: 50
+  sample_rate: 0.5
+  cluster: user
+  n_boot: 100
+seed: 0
