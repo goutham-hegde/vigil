@@ -136,6 +136,15 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 
 7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
 
+## Open question from the first real runs
+
+`graph_embed` came out weaker than `first_seen_edge` (test ROC-AUC 0.734 vs 0.889). Before concluding the graph does
+not help, check the obvious suspect: every user or host absent from the 8 training days is given the maximum score
+(`UNSEEN = 1.0` in `vigil/models/graph.py`), so a large block of events ties at the top and the model cannot rank
+within it. Count how many test events hit that path. If it is a large share, either widen the fitting window, or fall
+back to a finer score for unseen entities instead of a constant. Report the honest number either way: "the graph model
+did not add anything" is a perfectly good result, but it should be the real reason.
+
 ## Gotchas found the hard way
 
 - `recall@budget` averages over tied scores; coarse heuristics tie thousands of events per day, and row order must not

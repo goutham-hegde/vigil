@@ -66,7 +66,17 @@ days only, and the numbers below come from [`models/benchmarks.json`](models/ben
 `python -m vigil.bench report`; none of them is typed by hand.
 
 <!-- LANL:START -->
-Not generated yet: run `python -m vigil.bench report --data lanl`.
+Test window: days 12–29, 386 labelled red-team logons among 106,704,513 scored authentications (about 1 in 276,436).
+
+| Model | AP | Recall @100 alerts/day | ROC-AUC |
+|---|---:|---:|---:|
+| first_seen_edge | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.889 <sub>[0.808, 0.935]</sub> |
+| graph_embed | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.734 <sub>[0.640, 0.813]</sub> |
+| random | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.513 <sub>[0.461, 0.551]</sub> |
+
+Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because published work does, but at this class imbalance it flatters everything: read AP and the alert-budget recall.
+
+Full tables, ablations and published-baseline comparisons: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 <!-- LANL:END -->
 
 ## Results on the simulator
