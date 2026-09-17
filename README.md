@@ -66,13 +66,13 @@ days only, and the numbers below come from [`models/benchmarks.json`](models/ben
 `python -m vigil.bench report`; none of them is typed by hand.
 
 <!-- LANL:START -->
-Test window: days 12–29, 386 labelled red-team logons among 106,704,513 scored authentications (about 1 in 276,436).
+Test window: days 12–29, 386 labelled red-team logons among 106,704,513 scored authentications (about 1 in 276,436, so a random scorer lands near AP 3.6e-06).
 
 | Model | AP | Recall @100 alerts/day | ROC-AUC |
 |---|---:|---:|---:|
-| first_seen_edge | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.889 <sub>[0.808, 0.935]</sub> |
-| graph_embed | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.734 <sub>[0.640, 0.813]</sub> |
-| random | 0.000 <sub>[0.000, 0.000]</sub> | 0.000 <sub>[0.000, 0.000]</sub> | 0.513 <sub>[0.461, 0.551]</sub> |
+| first_seen_edge | 2.3e-04 <sub>[8.7e-05, 4.8e-04]</sub> | 3.3e-04 <sub>[1.5e-04, 6.7e-04]</sub> | 0.889 <sub>[0.808, 0.935]</sub> |
+| graph_embed | 1.2e-05 <sub>[4.6e-06, 3.0e-05]</sub> | 1.1e-04 <sub>[5.3e-05, 2.6e-04]</sub> | 0.734 <sub>[0.640, 0.813]</sub> |
+| random | 3.8e-06 <sub>[2.2e-06, 6.1e-06]</sub> | 0 <sub>[0, 0]</sub> | 0.513 <sub>[0.461, 0.551]</sub> |
 
 Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because published work does, but at this class imbalance it flatters everything: read AP and the alert-budget recall.
 

@@ -57,14 +57,27 @@ def collect(data: str, runs_dir: Path = RUNS) -> dict:
     return out
 
 
+def _fmt(v: float) -> str:
+    """Three decimals normally, two significant digits for very small values.
+
+    Average precision against a 1-in-276,000 positive rate lives around 1e-4, and
+    printing that as "0.000" hides the entire result.
+    """
+    if v != v:  # NaN
+        return "n/a"
+    if v == 0:
+        return "0"
+    return f"{v:.3f}" if abs(v) >= 0.005 else f"{v:.1e}"
+
+
 def _cell(m: dict) -> str:
     if m["mean"] != m["mean"]:  # NaN
         return "n/a"
-    txt = f"{m['mean']:.3f}"
+    txt = _fmt(m["mean"])
     if m["std"] is not None:
-        txt += f" ± {m['std']:.3f}"
+        txt += f" ± {_fmt(m['std'])}"
     if m["lo"] is not None:
-        txt += f" <sub>[{m['lo']:.3f}, {m['hi']:.3f}]</sub>"
+        txt += f" <sub>[{_fmt(m['lo'])}, {_fmt(m['hi'])}]</sub>"
     return txt
 
 
@@ -116,7 +129,8 @@ def render_readme(bench: dict, split: str = "test") -> str:
     rows.sort(key=lambda e: -e["splits"][split]["metrics"]["ap"]["mean"])
     L = [f"Test window: days {ref['days'][0]}–{ref['days'][1] - 1}, "
          f"{ref['n_positive']} labelled red-team logons among {ref['events_scored']:,} scored authentications "
-         f"(about 1 in {ref['events_scored'] // max(ref['n_positive'], 1):,}).", "",
+         f"(about 1 in {ref['events_scored'] // max(ref['n_positive'], 1):,}, so a random scorer lands near "
+         f"AP {ref['n_positive'] / ref['events_scored']:.1e}).", "",
          "| Model | " + " | ".join(c for _, c in HEADLINE) + " |", "|---|---:|---:|---:|"]
     for e in rows:
         name = e["experiment"] + (" †" if e["supervised"] else "")

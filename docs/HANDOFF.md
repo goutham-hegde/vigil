@@ -136,6 +136,33 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 
 7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
 
+## First real results (2026-09-18, days 12-29, 386 red-team events in 106.7 M)
+
+| model | AP | recall @100/day | ROC-AUC |
+|---|---:|---:|---:|
+| first_seen_edge | 2.3e-04 | 3.3e-04 | 0.889 |
+| graph_embed | 1.2e-05 | 1.1e-04 | 0.734 |
+| random | 3.8e-06 | 0 | 0.513 |
+
+Random's AP equals the positive rate (3.6e-06), so the evaluation itself is sound. `first_seen_edge` is ~60x random
+on AP with a respectable AUC, and still catches almost nothing inside a realistic alert budget.
+
+**Check this before anything else tomorrow.** At 100 alerts a day the heuristic should catch roughly
+`budget / size of the novel-edge tie group` of any red-team events inside that group — percent-level, not 3e-04. Being
+60x below that suggests most red-team logons are *not* first-contact edges at all: the attacker reached hosts those
+accounts already used. One query answers it:
+
+```sql
+-- what share of labelled events are a first-ever user->host edge, and where do they rank?
+SELECT label, avg((e.hour = fud.first_hour)::INT) AS share_new_edge, count(*)
+FROM (<auth_events_sql>) e
+LEFT JOIN feat_first_user_dst fud ON fud.src_user = e.src_user AND fud.dst_comp = e.dst_comp
+WHERE e.day >= 12 AND e.day < 30 GROUP BY label;
+```
+
+If the share is low, that is a finding about the dataset worth putting in the report, and it also predicts which
+features matter: the per-user habit (sequence) and host-community (graph) signals rather than pure novelty.
+
 ## Open question from the first real runs
 
 `graph_embed` came out weaker than `first_seen_edge` (test ROC-AUC 0.734 vs 0.889). Before concluding the graph does
