@@ -94,17 +94,54 @@ The five totals sum to 1,648,275,307, exactly the figure LANL publishes for the 
 
 Raw data goes in `C:\data\lanl` and Parquet in `C:\data\lanl\parquet`. The env vars `VIGIL_LANL_RAW` and `VIGIL_LANL_PARQUET` override both locations. G: has little free space, so only small derived tables go there, under `data/`, which is gitignored.
 
-## Next steps
+## Next steps (day 3, 2026-09-18)
 
-1. When `auth.txt.gz` finishes, run `gzip -t` on it, then run `ingest --tables auth`. That's about 1.05 B rows, so expect 20–60 min, on AC power.
-2. Run `profile`, then read the data card and **fix `data.splits` in `configs/lanl.yaml`**:
-   - the splits are temporal;
-   - training red-team events are removed automatically;
-   - the test window must hold red-team activity.
+Everything below runs unattended. **Plug the laptop in first** — it was on battery all night and the CPU throttles hard.
 
-   Record the split in the card by rerunning `profile`.
-3. Run `build`, then `bench run random` and `bench run first_seen_edge`. That gives the first real numbers.
-4. Run `iforest` and `gbm_supervised` on LANL, and check how long the feature joins take per day.
-   - If they are too slow, lower `train_sample`, or materialise the features for each day.
-5. M2 continued: an unsupervised GBM, for example real-vs-shuffled density-ratio training or novelty pseudo-labels; a small tuning grid on val; then the first `docs/BENCHMARKS.md`.
-6. The `.gitignore` rule `data/` was changed to `/data/`, because it was hiding `vigil/data/`.
+1. **Finish the model runs.** The overnight chain was stopped after `graph_embed` on purpose; these two are left:
+
+   ```bash
+   .venv/Scripts/python -m vigil.bench run gbm_density_ratio     # est. 30-50 min
+   .venv/Scripts/python -m vigil.bench run iforest               # est. 45-90 min
+   .venv/Scripts/python -m vigil.bench report --data lanl        # rewrites docs/BENCHMARKS.md + the README table
+   ```
+
+   Estimates come from the measured runs: scoring 127 M events (val + test) is 1-2 min for a SQL model; the feature
+   join and the model's own predict dominate for the rest. `gbm_density_ratio` will confirm the per-day join cost, so
+   revise `iforest` from whatever it shows.
+
+2. **The supervised upper bound**, once the unsupervised numbers are in:
+
+   ```bash
+   .venv/Scripts/python -m vigil.bench run gbm_supervised        # marked as having seen labels
+   ```
+
+3. **Ablations** (M5). Each is a separate run, and the report groups them:
+
+   ```bash
+   .venv/Scripts/python -m vigil.bench run gbm_density_ratio --set "groups=[event,novelty]"
+   .venv/Scripts/python -m vigil.bench run gbm_density_ratio --set "groups=[event,novelty,history,user_hour]"   # auth only
+   ```
+
+   The auth-only run against the full-feature run is the "does multi-layer help?" answer. Report it either way.
+
+4. **Fusion** (needs the members above): `ensemble_mean`, then `ensemble_stack`.
+
+5. **`sequence_gru` is the risk.** Training is 1-3 h and scoring 127 M events through a per-user GRU may be 2-6 h,
+   and it is unmeasured. Start it only with the laptop on AC, and time a single day first:
+   if scoring cannot cover the whole test window, say so in the report and drop the model rather than scoring a subset.
+
+6. **NTLM base rate.** Every labelled red-team event is `NTLM / Network`, so report how common NTLM is among benign
+   logons; otherwise a model gets credit for learning one protocol. One query over `auth_edges_hourly`.
+
+7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
+
+## Gotchas found the hard way
+
+- `recall@budget` averages over tied scores; coarse heuristics tie thousands of events per day, and row order must not
+  decide the result. If a metric definition changes, `vigil.bench recompute` re-evaluates finished runs from their
+  score files instead of rescoring (scoring is the expensive part).
+- The bootstrap is the slow half of a run if anything in it re-sorts per draw. Keep it to cumulative sums.
+- The data card must never contain raw records: the LANL data is not redistributable. Counts only.
+- Both paper references in the original plan were wrong: Tuor's LANL paper is arXiv:1712.00557 (AUC 0.98), and Euler
+  is NDSS 2022. Verified figures and protocol differences are in `configs/published_baselines.yaml`.
