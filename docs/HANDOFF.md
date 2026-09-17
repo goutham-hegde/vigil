@@ -36,7 +36,7 @@ Where the ML upgrade stands, and the exact commands to carry it on. Update this 
   - redteam: 749 rows.
   - dns: 40,821,591 rows in 43 s.
   - flows: 129,977,412 rows in 256 s. Flows covers only 30 of the days, so host-flow features are missing on the other days.
-  - proc: started on day 1.
+  - proc: 426,045,096 rows in 674 s (58 days). At about 0.6–0.9 M rows/s, auth (about 1.05 B rows) should take roughly 20–30 min.
 
 ## Commands
 
