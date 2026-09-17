@@ -6,7 +6,15 @@ data:
   parquet: null
   derived: null
   users: human          # score human (U...) authentications; see USER_FILTERS
-  splits: null          # half-open day ranges, fixed from the data card before any modelling
+  # Half-open day ranges, fixed from docs/data/LANL_DATA_CARD.md before any modelling.
+  # Red-team activity runs days 1-29 and clusters early (day 8: 273 events, day 12: 209).
+  # Training drops its 50 known red-team rows; val keeps day 8's burst for fitting
+  # thresholds and stacking weights; test holds 411 red-team events over 18 days.
+  # Days 30-57 are unused: no red-team activity and no flow sensor.
+  splits:
+    train: [0, 8]
+    val: [8, 12]
+    test: [12, 30]
 eval:
   splits: [val, test]
   per_day_top: 2000     # exact scores kept per day (covers every alert budget reported)
