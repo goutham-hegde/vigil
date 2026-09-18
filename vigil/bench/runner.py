@@ -90,7 +90,21 @@ def run_id(experiment: str, cfg: dict, params: dict, seed: int) -> str:
 _LABEL = re.compile(r"\blabel\b", re.IGNORECASE)
 
 
-def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int) -> None:
+_LOG_EVERY = 20_000_000  # events between progress lines on the single-query path
+
+
+def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int, split: str = "") -> None:
+    """Score days [a, b) into `sink`, logging progress as it goes.
+
+    Scoring the test window takes hours and used to log nothing between its
+    start and its end, so a slow run was indistinguishable from a hung one.
+    Cost per day grows with the day index — the novelty and history features
+    join against cumulative tables — so the estimate below is deliberately
+    based on days already done rather than on a fixed rate, and it drifts
+    optimistic early on.
+    """
+    t0 = time.monotonic()
+    tag = f"{exp.name} {split}".strip()
     sql = exp.score_sql(ctx)
     base = ctx.events_sql()
     if sql is not None:
@@ -103,14 +117,20 @@ def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int) -> N
             WHERE e.day >= {a} AND e.day < {b}
         """
         reader = ctx.con.execute(query).to_arrow_reader(1 << 20)
+        next_log = _LOG_EVERY
         for batch in reader:
             sink.add(batch["key"], batch["score"], batch["label"], batch["day"], batch["cluster"])
+            if sink.n_seen >= next_log:
+                log.info("%s: %.0fM events, %.1f min elapsed", tag, sink.n_seen / 1e6,
+                         (time.monotonic() - t0) / 60)
+                next_log += _LOG_EVERY
         return
     joins, extra = exp.batch_columns(ctx) or ("", "")
     if _LABEL.search(joins) or _LABEL.search(extra):
         raise ValueError(f"{exp.name}: batch SQL must not reference the label")
     extra = f", {extra}" if extra else ""
-    for day in range(a, b):
+    ndays = b - a
+    for i, day in enumerate(range(a, b), start=1):
         reader = ctx.con.execute(
             f"SELECT e.*, hash(e.src_user) AS cluster {extra} FROM ({base}) e {joins} WHERE e.day = {day} ORDER BY e.key"
         ).to_arrow_reader(1 << 18)
@@ -123,6 +143,9 @@ def _stream(ctx: Context, exp: Experiment, sink: ScoreSink, a: int, b: int) -> N
             if len(scores) != tbl.num_rows:
                 raise ValueError(f"{exp.name}: returned {len(scores)} scores for {tbl.num_rows} rows")
             sink.add(tbl["key"].to_numpy(), scores, label, tbl["day"].to_numpy(), cluster)
+        done = time.monotonic() - t0
+        log.info("%s: day %d (%d/%d), %.0fM events, %.1f min elapsed, ~%.0f min left",
+                 tag, day, i, ndays, sink.n_seen / 1e6, done / 60, done / i * (ndays - i) / 60)
 
 
 def recompute(run_dir: Path) -> dict:
@@ -187,7 +210,7 @@ def run(experiment: str, cfg: dict, params: dict | None = None, seed: int | None
         a, b = ctx.splits[split]
         t1 = time.monotonic()
         sink = ScoreSink(ev["per_day_top"], ev["sample_rate"])
-        _stream(ctx, exp, sink, a, b)
+        _stream(ctx, exp, sink, a, b, split)
         tbl = sink.save(run_dir / f"scores_{split}.parquet")
         cluster = tbl["cluster"].to_numpy() if ev.get("cluster") else None
         res = evaluate(tbl["label"].to_numpy(), tbl["score"].to_numpy(), tbl["weight"].to_numpy(),
