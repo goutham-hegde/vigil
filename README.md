@@ -71,10 +71,13 @@ Test window: days 12–29, 386 labelled red-team logons among 106,704,513 scored
 | Model | AP | Recall @100 alerts/day | ROC-AUC |
 |---|---:|---:|---:|
 | first_seen_edge | 2.3e-04 <sub>[8.7e-05, 4.8e-04]</sub> | 3.3e-04 <sub>[1.5e-04, 6.7e-04]</sub> | 0.889 <sub>[0.808, 0.935]</sub> |
+| ntlm_only | 1.1e-04 <sub>[6.3e-05, 1.8e-04]</sub> | 4.1e-04 <sub>[3.2e-04, 5.3e-04]</sub> | 0.984 <sub>[0.979, 0.988]</sub> |
 | graph_embed | 1.2e-05 <sub>[4.6e-06, 3.0e-05]</sub> | 1.1e-04 <sub>[5.3e-05, 2.6e-04]</sub> | 0.734 <sub>[0.640, 0.813]</sub> |
 | random | 3.8e-06 <sub>[2.2e-06, 6.1e-06]</sub> | 0 <sub>[0, 0]</sub> | 0.513 <sub>[0.461, 0.551]</sub> |
 
 Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because published work does, but at this class imbalance it flatters everything: read AP and the alert-budget recall.
+
+**`ntlm_only` is a confound control, not a detector.** Every labelled red-team event is NTLM/Network, so the one-line rule `auth_type = 'NTLM'` scores ROC-AUC 0.984 while flagging a large fraction of the network every day — see its AP and alert-budget recall in the same row. Treat that AUC as the floor: a model scoring below it has not beaten a protocol check.
 
 Full tables, ablations and published-baseline comparisons: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
 <!-- LANL:END -->

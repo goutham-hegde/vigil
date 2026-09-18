@@ -9,16 +9,22 @@ Values are point estimates on the split; brackets are 95% bootstrap intervals re
 | model | seeds | AP | ROC-AUC | Recall @50/day | Recall @100/day | Recall @500/day | TPR @FPR 1e-4 |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | first_seen_edge | 1 | 2.3e-04 <sub>[8.7e-05, 4.8e-04]</sub> | 0.889 <sub>[0.808, 0.935]</sub> | 1.6e-04 <sub>[7.6e-05, 3.4e-04]</sub> | 3.3e-04 <sub>[1.5e-04, 6.7e-04]</sub> | 1.6e-03 <sub>[7.6e-04, 3.4e-03]</sub> | 0 <sub>[0, 0]</sub> |
+| ntlm_only | 1 | 1.1e-04 <sub>[6.3e-05, 1.8e-04]</sub> | 0.984 <sub>[0.979, 0.988]</sub> | 2.0e-04 <sub>[1.6e-04, 2.7e-04]</sub> | 4.1e-04 <sub>[3.2e-04, 5.3e-04]</sub> | 2.0e-03 <sub>[1.6e-03, 2.7e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | graph_embed | 1 | 1.2e-05 <sub>[4.6e-06, 3.0e-05]</sub> | 0.734 <sub>[0.640, 0.813]</sub> | 5.5e-05 <sub>[2.6e-05, 1.3e-04]</sub> | 1.1e-04 <sub>[5.3e-05, 2.6e-04]</sub> | 5.5e-04 <sub>[2.6e-04, 1.3e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | random | 1 | 3.8e-06 <sub>[2.2e-06, 6.1e-06]</sub> | 0.513 <sub>[0.461, 0.551]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> |
+
+**`ntlm_only` is a confound control, not a detector.** Every labelled red-team event is NTLM/Network, so the one-line rule `auth_type = 'NTLM'` scores ROC-AUC 0.984 while flagging a large fraction of the network every day — see its AP and alert-budget recall in the same row. Treat that AUC as the floor: a model scoring below it has not beaten a protocol check.
 
 ## val (days 8–11, 266 red-team events)
 
 | model | seeds | AP | ROC-AUC | Recall @50/day | Recall @100/day | Recall @500/day | TPR @FPR 1e-4 |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | first_seen_edge | 1 | 7.5e-04 <sub>[4.0e-04, 1.3e-03]</sub> | 0.918 <sub>[0.878, 0.961]</sub> | 2.5e-04 <sub>[1.5e-04, 4.0e-04]</sub> | 5.0e-04 <sub>[2.9e-04, 7.9e-04]</sub> | 2.5e-03 <sub>[1.5e-03, 4.0e-03]</sub> | 0 <sub>[0, 0]</sub> |
+| ntlm_only | 1 | 3.5e-04 <sub>[2.1e-04, 5.7e-04]</sub> | 0.982 <sub>[0.976, 0.987]</sub> | 2.1e-04 <sub>[1.6e-04, 2.8e-04]</sub> | 4.1e-04 <sub>[3.1e-04, 5.5e-04]</sub> | 2.1e-03 <sub>[1.6e-03, 2.8e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | graph_embed | 1 | 6.4e-05 <sub>[3.4e-05, 1.2e-04]</sub> | 0.771 <sub>[0.711, 0.826]</sub> | 2.0e-04 <sub>[8.9e-05, 3.7e-04]</sub> | 4.0e-04 <sub>[1.8e-04, 7.5e-04]</sub> | 2.0e-03 <sub>[8.9e-04, 3.7e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | random | 1 | 1.3e-05 <sub>[8.3e-06, 2.0e-05]</sub> | 0.494 <sub>[0.459, 0.532]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> |
+
+**`ntlm_only` is a confound control, not a detector.** Every labelled red-team event is NTLM/Network, so the one-line rule `auth_type = 'NTLM'` scores ROC-AUC 0.982 while flagging a large fraction of the network every day — see its AP and alert-budget recall in the same row. Treat that AUC as the floor: a model scoring below it has not beaten a protocol check.
 
 ## Published results on LANL
 
