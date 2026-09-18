@@ -147,16 +147,38 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 
 7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
 
-## First real results (2026-09-18, days 12-29, 386 red-team events in 106.7 M)
+## All unsupervised runs complete (2026-09-19, days 12-29, 386 red-team events in 106.7 M)
+
+Generated table in `docs/BENCHMARKS.md`; this is the summary. **Read the `ntlm_only` row first.**
 
 | model | AP | recall @100/day | ROC-AUC |
 |---|---:|---:|---:|
+| iforest | **4.1e-04** | 0 | 0.958 |
 | first_seen_edge | 2.3e-04 | 3.3e-04 | 0.889 |
+| ntlm_only | 1.1e-04 | **4.1e-04** | **0.984** |
 | graph_embed | 1.2e-05 | 1.1e-04 | 0.734 |
+| gbm_density_ratio | 7.0e-06 | 0 | 0.753 |
 | random | 3.8e-06 | 0 | 0.513 |
 
-Random's AP equals the positive rate (3.6e-06), so the evaluation itself is sound. `first_seen_edge` is ~60x random
-on AP with a respectable AUC, and still catches almost nothing inside a realistic alert budget.
+Random's AP equals the positive rate (3.6e-06), so the evaluation itself is sound.
+
+**The headline result is negative, and it is the honest one: no model tested beats a one-line protocol check.**
+`ntlm_only` has the best ROC-AUC (0.984, nothing else clears it) *and* the best recall at every alert budget. It wins
+two of the three headline metrics while being, by construction, not a detector at all. `iforest` takes AP but scores
+**zero** at 50, 100 and 500 alerts/day and zero TPR at FPR 1e-4 — it ranks positives above the bulk without putting a
+single one near the top, which is the distinction AP hides and the budget metric exists to expose.
+
+So the deliverable from M1-M4 is a measurement result, not a detector: on LANL, the metric the literature reports is
+largely a protocol artifact, and none of the unsupervised approaches — novelty heuristic, graph embedding, density
+ratio, isolation forest — catches anything inside an operational alert budget.
+
+**`gbm_density_ratio` failed to generalise, and its val number is a trap.** Val AUC 0.907 and recall@100/day 0.004
+(~10x every baseline) collapsed to AUC 0.753 and recall 0 on test, barely above random on AP. Val is days 8-11,
+dominated by day 8's 273-event burst, and is also where thresholds are fitted. **Do not quote a val number anywhere.**
+
+Next, in order: `gbm_supervised` (the upper bound — always paired with the NTLM `drop` ablation, or it just learns
+the protocol), then the multi-layer ablation, then decide whether `sequence_gru` is worth its runtime given that
+nothing so far clears the control.
 
 ## Three questions answered (2026-09-18, day 3)
 
