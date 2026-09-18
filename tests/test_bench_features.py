@@ -124,3 +124,27 @@ def test_sequence_scores_depend_only_on_the_past(fitted_gru):
     after = score(changed)
     np.testing.assert_array_equal(before[:-1], after[:-1])  # earlier events unaffected by a later change
     assert before[-1] != after[-1]  # the changed event itself does move
+
+
+def test_drop_removes_named_features_without_disturbing_the_rest():
+    """The NTLM-confound ablation must remove exactly three features and reorder nothing.
+
+    A fitted model reads its columns positionally, so a `drop` that resequenced
+    the survivors would silently score against the wrong features.
+    """
+    from vigil.models.auth_features import PROTOCOL_FEATURES
+    from vigil.models.gbm import FeatureModel
+
+    full = [f.name for f in FeatureModel({}).features]
+    assert full == list(FEATURE_NAMES)  # the default is every feature, unablated
+
+    ablated = [f.name for f in FeatureModel({"drop": list(PROTOCOL_FEATURES)}).features]
+    assert set(full) - set(ablated) == set(PROTOCOL_FEATURES)
+    assert ablated == [n for n in full if n not in PROTOCOL_FEATURES]
+
+    # The confound spans two groups, which is why `groups` alone cannot isolate it.
+    from vigil.models.auth_features import FEATURES
+    assert len({f.group for f in FEATURES if f.name in PROTOCOL_FEATURES}) > 1
+
+    with pytest.raises(ValueError, match="unknown features to drop"):
+        FeatureModel({"drop": ["not_a_feature"]})

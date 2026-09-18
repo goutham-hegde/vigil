@@ -135,3 +135,24 @@ def test_readme_table_is_generated_from_runs(cfg, tmp_path):
     plain.write_text("no markers here\n", encoding="utf-8")
     assert not report.update_readme(bench, plain)
     assert plain.read_text(encoding="utf-8") == "no markers here\n"
+
+
+def test_ntlm_control_is_reported_with_its_measured_auc(cfg, tmp_path):
+    """Every labelled LANL event is NTLM, so the protocol alone is a strong ranker by AUC.
+
+    Both generated reports have to say so, and with the number from the run:
+    without it a reader takes a high AUC as evidence of detection.
+    """
+    for e in ("random", "ntlm_only"):
+        runner.run(e, cfg, runs_dir=tmp_path, force_power=True)
+    bench = report.collect(cfg["name"], runs_dir=tmp_path)
+    control = next(e for e in bench["experiments"] if e["experiment"] == "ntlm_only")
+    auc = control["splits"]["test"]["metrics"]["roc_auc"]["mean"]
+    for text in (report.render(bench), report.render_readme(bench)):
+        assert "confound control" in text
+        assert f"{auc:.3f}" in text
+
+    # No control run, no claim about one.
+    only_random = report.collect(cfg["name"], runs_dir=tmp_path)
+    only_random["experiments"] = [e for e in only_random["experiments"] if e["experiment"] != "ntlm_only"]
+    assert "confound control" not in report.render(only_random)

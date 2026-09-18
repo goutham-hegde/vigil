@@ -5,6 +5,9 @@
 * `first_seen_edge`: the classic LANL heuristic. Lateral movement means a user
   logging on to a host they have never touched, often from a host they have
   never used. It is a strong baseline on this data and is reported as such.
+* `ntlm_only`: not a detector but a control. Every labelled red-team event in
+  this collection is NTLM/Network, so "is it NTLM" alone is a near-perfect
+  ranker by AUC. Any model whose AUC does not clear it has shown nothing.
 """
 
 from __future__ import annotations
@@ -16,6 +19,23 @@ from ..bench.experiment import Context, Experiment, register
 class RandomScore(Experiment):
     def score_sql(self, ctx: Context):
         return "", f"hash(e.key, {int(ctx.seed)}) / 18446744073709551616.0"
+
+
+@register("ntlm_only")
+class NtlmOnly(Experiment):
+    """Score = 1 if the logon is NTLM, else 0. A confound control, not a detector.
+
+    Every one of the 702 labelled events is NTLM/Network while only ~3.3% of
+    benign human logons are, so this one-line rule ranks almost every red-team
+    event above almost every benign one. Its AUC is therefore the floor that a
+    real model has to beat before its own AUC means anything, and it is the
+    reason the headline metrics here are AP and recall at an alert budget: the
+    rule flags ~196k events a day, so it is worthless to an analyst despite the
+    AUC. Reported, never tuned.
+    """
+
+    def score_sql(self, ctx: Context):
+        return "", "(e.auth_type = 'NTLM')::INT"
 
 
 @register("first_seen_edge")

@@ -6,8 +6,18 @@
   red-team labels. It shows how far features alone can go when attacks of the
   same kind have been seen before. The report marks it as an upper bound.
 
-Both accept `groups` (the feature groups to use, for ablations) and
-`train_sample` (how many benign training events to fit on).
+Both accept `groups` (the feature groups to use, for ablations), `drop`
+(individual features to remove) and `train_sample` (how many benign training
+events to fit on).
+
+`drop` exists for the NTLM confound. Every labelled red-team event in the LANL
+collection is NTLM/Network against a 3.3% benign base rate, so the protocol
+alone ranks at ROC-AUC ~0.98 (the `ntlm_only` baseline). Three features carry
+that signal — `auth_type_code`, `logon_type_code` and `user_hour_ntlm` — and
+they sit in two different groups, so `groups` cannot isolate them. Running a
+model with `drop=[auth_type_code,logon_type_code,user_hour_ntlm]` against the
+same model unablated is what separates "found lateral movement" from "found
+NTLM".
 """
 
 from __future__ import annotations
@@ -30,7 +40,13 @@ class FeatureModel(Experiment):
         unknown = set(groups) - set(GROUPS)
         if unknown:
             raise ValueError(f"unknown feature groups {sorted(unknown)}; known: {GROUPS}")
-        self.features = [f for f in FEATURES if f.group in groups]
+        drop = set(self.params.get("drop") or ())
+        unknown_drop = drop - {f.name for f in FEATURES}
+        if unknown_drop:
+            raise ValueError(f"unknown features to drop {sorted(unknown_drop)}")
+        self.features = [f for f in FEATURES if f.group in groups and f.name not in drop]
+        if not self.features:
+            raise ValueError(f"{self.name}: no features left after groups/drop")
 
     def batch_columns(self, ctx: Context):
         return JOINS, select_list(self.features)

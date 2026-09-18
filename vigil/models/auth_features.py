@@ -105,6 +105,12 @@ FEATURES: list[Feature] = [
 FEATURE_NAMES = tuple(f.name for f in FEATURES)
 GROUPS = tuple(dict.fromkeys(f.group for f in FEATURES))
 
+# The features that carry the NTLM confound. Every labelled red-team event is
+# NTLM/Network against a 3.3% benign base rate, so these three alone are worth
+# ROC-AUC ~0.98 (see the `ntlm_only` baseline). They span two groups, so an
+# ablation has to name them individually: pass them as `drop` to a FeatureModel.
+PROTOCOL_FEATURES = ("auth_type_code", "logon_type_code", "user_hour_ntlm")
+
 JOINS = """
     LEFT JOIN feat_first_user_dst fud ON fud.src_user = e.src_user AND fud.dst_comp = e.dst_comp
     LEFT JOIN feat_first_user_src fus ON fus.src_user = e.src_user AND fus.src_comp = e.src_comp

@@ -77,6 +77,7 @@ The five totals sum to 1,648,275,307, exactly the figure LANL publishes for the 
 # Benchmarks (needs data.splits set in configs/lanl.yaml)
 .venv/Scripts/python -m vigil.bench run random
 .venv/Scripts/python -m vigil.bench run first_seen_edge
+.venv/Scripts/python -m vigil.bench run ntlm_only                            # confound control, always report it
 .venv/Scripts/python -m vigil.bench run iforest
 .venv/Scripts/python -m vigil.bench run gbm_density_ratio                    # unsupervised
 .venv/Scripts/python -m vigil.bench run graph_embed
@@ -98,11 +99,12 @@ Raw data goes in `C:\data\lanl` and Parquet in `C:\data\lanl\parquet`. The env v
 
 Everything below runs unattended. **Plug the laptop in first** — it was on battery all night and the CPU throttles hard.
 
-1. **Finish the model runs.** The overnight chain was stopped after `graph_embed` on purpose; these two are left:
+1. **Finish the model runs.** The overnight chain was stopped after `graph_embed` on purpose; these are left:
 
    ```bash
    .venv/Scripts/python -m vigil.bench run gbm_density_ratio     # est. 30-50 min
    .venv/Scripts/python -m vigil.bench run iforest               # est. 45-90 min
+   .venv/Scripts/python -m vigil.bench run ntlm_only             # ~2 min, SQL; the confound control, see below
    .venv/Scripts/python -m vigil.bench report --data lanl        # rewrites docs/BENCHMARKS.md + the README table
    ```
 
@@ -119,11 +121,20 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 3. **Ablations** (M5). Each is a separate run, and the report groups them:
 
    ```bash
+   # The one that matters most: is the model finding lateral movement, or finding NTLM?
+   .venv/Scripts/python -m vigil.bench run gbm_density_ratio \
+       --set "drop=[auth_type_code,logon_type_code,user_hour_ntlm]"
+
    .venv/Scripts/python -m vigil.bench run gbm_density_ratio --set "groups=[event,novelty]"
    .venv/Scripts/python -m vigil.bench run gbm_density_ratio --set "groups=[event,novelty,history,user_hour]"   # auth only
    ```
 
    The auth-only run against the full-feature run is the "does multi-layer help?" answer. Report it either way.
+
+   The `drop` run is the answer to finding 3 below. Three features carry the NTLM confound
+   (`auth_features.PROTOCOL_FEATURES`) and they span two groups, so `groups` cannot isolate them — hence `drop`.
+   **Run it for `gbm_supervised` too, where the confound is worst**: a supervised model will learn "NTLM" straight
+   from the labels, so its unablated number is close to meaningless as an upper bound.
 
 4. **Fusion** (needs the members above): `ensemble_mean`, then `ensemble_stack`.
 
@@ -131,8 +142,8 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
    and it is unmeasured. Start it only with the laptop on AC, and time a single day first:
    if scoring cannot cover the whole test window, say so in the report and drop the model rather than scoring a subset.
 
-6. **NTLM base rate.** Every labelled red-team event is `NTLM / Network`, so report how common NTLM is among benign
-   logons; otherwise a model gets credit for learning one protocol. One query over `auth_edges_hourly`.
+6. ~~**NTLM base rate.**~~ Done — and it is worse than expected. See "Three questions answered" below: a bare
+   `auth_type = 'NTLM'` test scores ROC-AUC ≈ 0.98 on its own. Run `ntlm_only` and print it in every table.
 
 7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
 
@@ -147,30 +158,70 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 Random's AP equals the positive rate (3.6e-06), so the evaluation itself is sound. `first_seen_edge` is ~60x random
 on AP with a respectable AUC, and still catches almost nothing inside a realistic alert budget.
 
-**Check this before anything else tomorrow.** At 100 alerts a day the heuristic should catch roughly
-`budget / size of the novel-edge tie group` of any red-team events inside that group — percent-level, not 3e-04. Being
-60x below that suggests most red-team logons are *not* first-contact edges at all: the attacker reached hosts those
-accounts already used. One query answers it:
+## Three questions answered (2026-09-18, day 3)
+
+All three were open at the end of day 2. The first two hypotheses in this file were **wrong**; the answers are below
+and the reasoning they replace has been deleted so nobody re-runs it.
+
+### 1. Red-team logons *are* novel edges. The novel-edge population is just enormous.
+
+The worry was that `first_seen_edge` scores 3.3e-04 at 100 alerts/day because red-team logons are not first-contact
+edges at all. They are:
+
+| test events | first-ever user→dst | first-ever user←src | both |
+|---|---:|---:|---:|
+| benign (106,704,127) | 0.313% | 0.489% | 0.237% |
+| red team (386) | **37.6%** | 21.8% | 8.8% |
+
+A 120x lift, so novelty is a genuine signal. The budget metric is low for a different reason — the size of the tie
+groups it has to average over:
+
+| score | what it means | benign/day | red team (18 days) |
+|---:|---|---:|---:|
+| 3.5 | dst *and* src edge both new | 14,154 | 34 |
+| 2.5 | dst edge new | 4,190 | 111 |
+| | **cumulative** | **18,343** | **145** |
+
+145 of 386 red-team events sit in the top two tie groups, alongside 18,343 benign events *per day*. A 100-alert budget
+buys ~0.5% of one tie group, which reproduces the measured 3.3e-04 almost exactly. So the metric is right and the
+heuristic is real but hopelessly unselective: in a network of 5.9 M human logons a day, 18 k first-contact logons a day
+are simply routine. **This is the finding to report** — it is the argument for the whole modelling effort, since
+ranking *within* that block is exactly what a learned model has to do.
+
+### 2. `graph_embed`'s `UNSEEN` constant is not what holds it back — the embedding is.
+
+The `UNSEEN = 1.0` block is large (68,728 benign events/day, 1.15% of benign; 9.8% of labelled), but deleting it makes
+the model *worse*, not better:
+
+| graph_embed, test | ROC-AUC | AP | recall@100/day |
+|---|---:|---:|---:|
+| as reported | 0.734 | 1.2e-05 | 1.1e-04 |
+| known (user, host) pairs only | 0.714 | 8.0e-06 | 0 |
+
+So the constant is carrying the model and the learned PPMI+SVD cosine is the weak half. Widening the fitting window or
+softening `UNSEEN` would not rescue it. **The honest conclusion is that the graph embedding adds nothing over the
+trivial novelty heuristic on this data**, and the reason is the embedding itself. Do not spend more time on it; if the
+graph is worth another attempt it needs a different formulation (temporal, or community-deviation), not a tweak.
+
+### 3. The NTLM confound is severe, and it invalidates ROC-AUC as a headline.
+
+Every one of the labelled events is NTLM/Network, against a 3.30% benign base rate. So this rule —
 
 ```sql
--- what share of labelled events are a first-ever user->host edge, and where do they rank?
-SELECT label, avg((e.hour = fud.first_hour)::INT) AS share_new_edge, count(*)
-FROM (<auth_events_sql>) e
-LEFT JOIN feat_first_user_dst fud ON fud.src_user = e.src_user AND fud.dst_comp = e.dst_comp
-WHERE e.day >= 12 AND e.day < 30 GROUP BY label;
+score = (auth_type = 'NTLM')
 ```
 
-If the share is low, that is a finding about the dataset worth putting in the report, and it also predicts which
-features matter: the per-user habit (sequence) and host-community (graph) signals rather than pure novelty.
+— ranks nearly every red-team event above nearly every benign one, for **ROC-AUC ≈ 0.98**. That beats every model
+measured so far (`first_seen_edge` 0.889) and matches the 0.98 that Tuor et al. publish on this dataset. It is also
+useless: it flags ~195,700 events a day.
 
-## Open question from the first real runs
-
-`graph_embed` came out weaker than `first_seen_edge` (test ROC-AUC 0.734 vs 0.889). Before concluding the graph does
-not help, check the obvious suspect: every user or host absent from the 8 training days is given the maximum score
-(`UNSEEN = 1.0` in `vigil/models/graph.py`), so a large block of events ties at the top and the model cannot rank
-within it. Count how many test events hit that path. If it is a large share, either widen the fitting window, or fall
-back to a finer score for unseen entities instead of a constant. Report the honest number either way: "the graph model
-did not add anything" is a perfectly good result, but it should be the real reason.
+Consequences, and they are not optional:
+- `ntlm_only` is now a registered baseline (`vigil/models/baselines.py`) so the number comes from a run, not from
+  arithmetic in a doc. Every report must carry it.
+- **AP and recall at an alert budget are the headline metrics; ROC-AUC is reported but never led with.** An AUC below
+  0.98 on this data means a model is doing *worse than a protocol check*.
+- Any model that is allowed `auth_type` as a feature must be checked against this, or it gets credit for learning one
+  protocol. This is the same class of shortcut as the three the README already documents.
 
 ## Gotchas found the hard way
 
