@@ -4,7 +4,8 @@
   Fully unsupervised; the score is how easy an event is to isolate.
 * `gbm_supervised`: LightGBM trained on the training window *with* its
   red-team labels. It shows how far features alone can go when attacks of the
-  same kind have been seen before. The report marks it as an upper bound.
+  same kind have been seen before. The report marks it †: on LANL it
+  recognises the attacker host behind most training labels and nothing else.
 
 Both accept `groups` (the feature groups to use, for ablations), `drop`
 (individual features to remove) and `train_sample` (how many benign training
@@ -141,11 +142,19 @@ class GBMSupervised(FeatureModel):
         categorical = [i for i, f in enumerate(self.features) if f.categorical]
         data = lgb.Dataset(X, y, feature_name=[f.name for f in self.features], categorical_feature=categorical,
                            free_raw_data=False)
+        # With ~50 positives among 2 M rows the trees separate the positives
+        # within a few rounds, their hessians go to zero, and an uncapped leaf
+        # value explodes: the first LANL run stopped after 24 trees with raw
+        # scores near -3e6 and ranked test positives below random. The leaf
+        # cap, L2 and minimum hessian per leaf keep every tree finite.
         params = {
             "objective": "binary",
             "learning_rate": float(self.params.get("learning_rate", 0.05)),
-            "num_leaves": int(self.params.get("num_leaves", 31)),
-            "min_child_samples": int(self.params.get("min_child_samples", 20)),
+            "num_leaves": int(self.params.get("num_leaves", 15)),
+            "min_child_samples": int(self.params.get("min_child_samples", 100)),
+            "max_delta_step": float(self.params.get("max_delta_step", 1.0)),
+            "lambda_l2": float(self.params.get("lambda_l2", 10.0)),
+            "min_sum_hessian_in_leaf": float(self.params.get("min_sum_hessian_in_leaf", 1.0)),
             "feature_fraction": 0.8, "bagging_fraction": 0.8, "bagging_freq": 1,
             "scale_pos_weight": float(self.params.get("scale_pos_weight", 10.0)),
             "seed": ctx.seed, "deterministic": True, "num_threads": 0, "verbose": -1,

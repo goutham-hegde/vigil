@@ -25,7 +25,7 @@ Where the ML upgrade stands, and the exact commands to carry it on. Update this 
   - `tests/test_bench_features.py` proves causality: deleting future days changes no earlier feature.
 - `vigil/models/gbm.py`:
   - `iforest`: unsupervised.
-  - `gbm_supervised`: trained on training-window red-team labels, and marked † in the report as an upper bound.
+  - `gbm_supervised`: trained on training-window red-team labels, and marked † in the report (it recognises a seen attacker, not a new one).
   - Both take `groups=[...]` for ablations.
 - `vigil/models/gbm.py` also has `gbm_density_ratio`: an unsupervised GBM. Benign training events are class 1, and class 0 is made by shuffling each feature column independently, so the model learns which *combinations* normal activity never produces (ESL 14.2.4). Same features as the supervised model, no labels anywhere.
 
@@ -147,6 +147,48 @@ Everything below runs unattended. **Plug the laptop in first** — it was on bat
 
 7. Then R1: README hero (the table is already generated), architecture SVG, demo GIF, and the resume bullets.
 
+## Supervised runs complete (2026-09-20)
+
+**The first `gbm_supervised` run was invalid and has been overwritten.** With 50 positives in 2 M rows the trees
+separated the positives within a few rounds, their hessians went to zero, and the uncapped leaf values exploded:
+24 trees instead of 300, raw scores near -3e6, test ROC-AUC 0.485 (0.333 with NTLM dropped), i.e. below random.
+`gbm.py` now caps the leaf output (`max_delta_step`), adds L2 and a minimum hessian per leaf. Both runs were redone
+with `--force` (the run key hashes only the passed params, so a changed default does not change the run folder).
+
+Test, days 12-29 (generated table in `docs/BENCHMARKS.md`):
+
+| gbm_supervised † | AP | recall @100/day | ROC-AUC |
+|---|---:|---:|---:|
+| all features | **0.054** | **0.241** | 1.000 |
+| auth-only groups (no proc/flow/dns) | 0.006 | 0.101 | 0.999 |
+| NTLM features dropped | 0.016 | 0.070 | 0.999 |
+| NTLM, `orientation_code`, `src_proc_*` dropped | 3.1e-03 | 0.041 | 0.996 |
+| *`ntlm_only` control* | *1.1e-04* | *4.1e-04* | *0.984* |
+
+The first model to catch anything inside an alert budget: ~590x the control's recall. Dropping the protocol costs
+~3x but leaves it far above every unsupervised model, and host context (proc/flow/dns) is worth ~2.4x recall over
+auth alone. **But it is recognising one attacker, not detecting lateral movement.** Per source host, from the score
+files joined to the auth table by `key` (test positives within their day's alert ranking):
+
+| run | C17693 (367 positives): top 100 / top 500 | other red-team hosts (19): top 100 / top 500 |
+|---|---:|---:|
+| all features | 93 / 169 | 0 / 0 |
+| NTLM dropped | 28 / 97 | 0 / 0 |
+| NTLM, LogOn, proc dropped | 16 / 38 | 0 / 0 |
+| auth-only groups | 39 / 79 | 0 / 0 |
+
+C17693 is also the source of 42 of the 50 training positives. Every catch in every variant is that host; the 19
+events from C19932 and C22409 never reach the top 500 (median rank 2,300-25,000 a day). The report's † footnote
+now says this instead of "upper bound". Other label artefacts found along the way: every labelled event is a LogOn
+(`orientation_code` alone is AUC 0.815 on test), and the red-team source hosts have no process telemetry
+(`src_proc_starts` median 0 vs 2.8 for benign).
+
+**Do not quote val numbers** (val AP 0.44 vs test 0.054 for the same model) — val is day 8's C17693 burst.
+
+Next: fusion (`ensemble_mean`, `ensemble_stack`), then decide on `sequence_gru`. A fairer supervised protocol would
+hold out by attacker host rather than by time, but with 4 source hosts and 42 of 50 training labels on one of them
+there is not enough data to do it; say so in the write-up rather than invent a split.
+
 ## All unsupervised runs complete (2026-09-19, days 12-29, 386 red-team events in 106.7 M)
 
 Generated table in `docs/BENCHMARKS.md`; this is the summary. **Read the `ntlm_only` row first.**
@@ -176,7 +218,7 @@ ratio, isolation forest — catches anything inside an operational alert budget.
 (~10x every baseline) collapsed to AUC 0.753 and recall 0 on test, barely above random on AP. Val is days 8-11,
 dominated by day 8's 273-event burst, and is also where thresholds are fitted. **Do not quote a val number anywhere.**
 
-Next, in order: `gbm_supervised` (the upper bound — always paired with the NTLM `drop` ablation, or it just learns
+Next, in order (done 2026-09-20, see above): `gbm_supervised` (always paired with the NTLM `drop` ablation, or it just learns
 the protocol), then the multi-layer ablation, then decide whether `sequence_gru` is worth its runtime given that
 nothing so far clears the control.
 

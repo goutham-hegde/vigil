@@ -70,6 +70,10 @@ Test window: days 12–29, 386 labelled red-team logons among 106,704,513 scored
 
 | Model | AP | Recall @100 alerts/day | ROC-AUC |
 |---|---:|---:|---:|
+| gbm_supervised † | 0.054 <sub>[0.026, 0.118]</sub> | 0.241 <sub>[0.151, 0.408]</sub> | 1.000 <sub>[1.000, 1.000]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm"]}` | 0.016 <sub>[0.007, 0.035]</sub> | 0.070 <sub>[0.033, 0.138]</sub> | 0.999 <sub>[0.998, 0.999]</sub> |
+| gbm_supervised † `{"groups": ["event", "novelty", "history", "user_hour"]}` | 0.006 <sub>[2.4e-03, 0.020]</sub> | 0.101 <sub>[0.028, 0.199]</sub> | 0.999 <sub>[0.997, 0.999]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm", "orientation_code", "src_proc_starts", "src_proc_new"]}` | 3.1e-03 <sub>[1.8e-03, 0.006]</sub> | 0.041 <sub>[0.015, 0.093]</sub> | 0.996 <sub>[0.994, 0.998]</sub> |
 | iforest | 4.1e-04 <sub>[1.2e-04, 1.5e-03]</sub> | 0 <sub>[0, 2.7e-03]</sub> | 0.958 <sub>[0.936, 0.972]</sub> |
 | first_seen_edge | 2.3e-04 <sub>[8.7e-05, 4.8e-04]</sub> | 3.3e-04 <sub>[1.5e-04, 6.7e-04]</sub> | 0.889 <sub>[0.808, 0.935]</sub> |
 | ntlm_only | 1.1e-04 <sub>[6.3e-05, 1.8e-04]</sub> | 4.1e-04 <sub>[3.2e-04, 5.3e-04]</sub> | 0.984 <sub>[0.979, 0.988]</sub> |
@@ -82,6 +86,8 @@ Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because pub
 **`ntlm_only` is a confound control, not a detector.** Every labelled red-team event is NTLM/Network, so the one-line rule `auth_type = 'NTLM'` scores ROC-AUC 0.984 while flagging a large fraction of the network every day — see its AP and alert-budget recall in the same row. Treat that AUC as the floor: a model scoring below it has not beaten a protocol check.
 
 Full tables, ablations and published-baseline comparisons: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+
+† Trained on red-team labels from an earlier window of the same exercise: it recognises an attacker it has seen labelled, not a new one. Not a deployable result.
 <!-- LANL:END -->
 
 ## Results on the simulator

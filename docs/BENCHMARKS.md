@@ -8,6 +8,10 @@ Values are point estimates on the split; brackets are 95% bootstrap intervals re
 
 | model | seeds | AP | ROC-AUC | Recall @50/day | Recall @100/day | Recall @500/day | TPR @FPR 1e-4 |
 |---|---:|---:|---:|---:|---:|---:|---:|
+| gbm_supervised † | 1 | 0.054 <sub>[0.026, 0.118]</sub> | 1.000 <sub>[1.000, 1.000]</sub> | 0.124 <sub>[0.081, 0.243]</sub> | 0.241 <sub>[0.151, 0.408]</sub> | 0.438 <sub>[0.274, 0.709]</sub> | 0.549 <sub>[0.321, 0.785]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm"]}` | 1 | 0.016 <sub>[0.007, 0.035]</sub> | 0.999 <sub>[0.998, 0.999]</sub> | 0.049 <sub>[0.022, 0.095]</sub> | 0.070 <sub>[0.033, 0.138]</sub> | 0.251 <sub>[0.138, 0.407]</sub> | 0.308 <sub>[0.179, 0.468]</sub> |
+| gbm_supervised † `{"groups": ["event", "novelty", "history", "user_hour"]}` | 1 | 0.006 <sub>[2.4e-03, 0.020]</sub> | 0.999 <sub>[0.997, 0.999]</sub> | 0.070 <sub>[0.014, 0.122]</sub> | 0.101 <sub>[0.028, 0.199]</sub> | 0.205 <sub>[0.103, 0.397]</sub> | 0.241 <sub>[0.085, 0.468]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm", "orientation_code", "src_proc_starts", "src_proc_new"]}` | 1 | 3.1e-03 <sub>[1.8e-03, 0.006]</sub> | 0.996 <sub>[0.994, 0.998]</sub> | 0.021 <sub>[3.9e-03, 0.053]</sub> | 0.041 <sub>[0.015, 0.093]</sub> | 0.098 <sub>[0.045, 0.230]</sub> | 0.153 <sub>[0.068, 0.286]</sub> |
 | iforest | 1 | 4.1e-04 <sub>[1.2e-04, 1.5e-03]</sub> | 0.958 <sub>[0.936, 0.972]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 2.7e-03]</sub> | 0 <sub>[0, 0.084]</sub> | 0 <sub>[0, 0.119]</sub> |
 | first_seen_edge | 1 | 2.3e-04 <sub>[8.7e-05, 4.8e-04]</sub> | 0.889 <sub>[0.808, 0.935]</sub> | 1.6e-04 <sub>[7.6e-05, 3.4e-04]</sub> | 3.3e-04 <sub>[1.5e-04, 6.7e-04]</sub> | 1.6e-03 <sub>[7.6e-04, 3.4e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | ntlm_only | 1 | 1.1e-04 <sub>[6.3e-05, 1.8e-04]</sub> | 0.984 <sub>[0.979, 0.988]</sub> | 2.0e-04 <sub>[1.6e-04, 2.7e-04]</sub> | 4.1e-04 <sub>[3.2e-04, 5.3e-04]</sub> | 2.0e-03 <sub>[1.6e-03, 2.7e-03]</sub> | 0 <sub>[0, 0]</sub> |
@@ -21,6 +25,10 @@ Values are point estimates on the split; brackets are 95% bootstrap intervals re
 
 | model | seeds | AP | ROC-AUC | Recall @50/day | Recall @100/day | Recall @500/day | TPR @FPR 1e-4 |
 |---|---:|---:|---:|---:|---:|---:|---:|
+| gbm_supervised † | 1 | 0.439 <sub>[0.319, 0.561]</sub> | 1.000 <sub>[1.000, 1.000]</sub> | 0.120 <sub>[0.070, 0.190]</sub> | 0.211 <sub>[0.129, 0.339]</sub> | 0.737 <sub>[0.572, 0.927]</sub> | 0.865 <sub>[0.734, 1.000]</sub> |
+| gbm_supervised † `{"groups": ["event", "novelty", "history", "user_hour"]}` | 1 | 0.243 <sub>[0.169, 0.354]</sub> | 1.000 <sub>[1.000, 1.000]</sub> | 0.053 <sub>[0.010, 0.117]</sub> | 0.117 <sub>[0.057, 0.249]</sub> | 0.564 <sub>[0.428, 0.791]</sub> | 0.793 <sub>[0.613, 0.938]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm"]}` | 1 | 0.121 <sub>[0.059, 0.283]</sub> | 1.000 <sub>[1.000, 1.000]</sub> | 0.060 <sub>[0.023, 0.138]</sub> | 0.117 <sub>[0.048, 0.270]</sub> | 0.504 <sub>[0.316, 0.736]</sub> | 0.650 <sub>[0.295, 0.853]</sub> |
+| gbm_supervised † `{"drop": ["auth_type_code", "logon_type_code", "user_hour_ntlm", "orientation_code", "src_proc_starts", "src_proc_new"]}` | 1 | 0.047 <sub>[0.024, 0.138]</sub> | 1.000 <sub>[1.000, 1.000]</sub> | 0.011 <sub>[0, 0.070]</sub> | 0.011 <sub>[0, 0.157]</sub> | 0.207 <sub>[0.038, 0.491]</sub> | 0.402 <sub>[0.227, 0.716]</sub> |
 | iforest | 1 | 2.2e-03 <sub>[9.1e-04, 0.018]</sub> | 0.996 <sub>[0.993, 0.999]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0.064]</sub> | 0 <sub>[0, 0.263]</sub> |
 | first_seen_edge | 1 | 7.5e-04 <sub>[4.0e-04, 1.3e-03]</sub> | 0.918 <sub>[0.878, 0.961]</sub> | 2.5e-04 <sub>[1.5e-04, 4.0e-04]</sub> | 5.0e-04 <sub>[2.9e-04, 7.9e-04]</sub> | 2.5e-03 <sub>[1.5e-03, 4.0e-03]</sub> | 0 <sub>[0, 0]</sub> |
 | ntlm_only | 1 | 3.5e-04 <sub>[2.1e-04, 5.7e-04]</sub> | 0.982 <sub>[0.976, 0.987]</sub> | 2.1e-04 <sub>[1.6e-04, 2.8e-04]</sub> | 4.1e-04 <sub>[3.1e-04, 5.5e-04]</sub> | 2.1e-03 <sub>[1.6e-03, 2.8e-03]</sub> | 0 <sub>[0, 0]</sub> |
@@ -29,6 +37,8 @@ Values are point estimates on the split; brackets are 95% bootstrap intervals re
 | random | 1 | 1.3e-05 <sub>[8.3e-06, 2.0e-05]</sub> | 0.494 <sub>[0.459, 0.532]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> | 0 <sub>[0, 0]</sub> |
 
 **`ntlm_only` is a confound control, not a detector.** Every labelled red-team event is NTLM/Network, so the one-line rule `auth_type = 'NTLM'` scores ROC-AUC 0.982 while flagging a large fraction of the network every day — see its AP and alert-budget recall in the same row. Treat that AUC as the floor: a model scoring below it has not beaten a protocol check.
+
+† Supervised: trained on red-team labels from the training window of the same exercise. It measures how well a model recognises an attacker it has already seen labelled, not how well it detects a new one; a deployment facing a new intrusion has no such labels.
 
 ## Published results on LANL
 

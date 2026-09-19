@@ -54,8 +54,10 @@ only on a hash of the row id, so every model is judged on the same negatives.
 
 **Supervised results are labelled as such.** `gbm_supervised` trains on
 red-team labels from the training window, and `ensemble_stack` fits its
-weights on labelled validation data. Both are marked † in the report. They are
-upper bounds: a real deployment meeting a new intrusion has no labels for it.
+weights on labelled validation data. Both are marked † in the report. They
+measure recognising an attacker already seen labelled, not detecting a new one:
+on LANL every test catch comes from the host that dominates the training labels.
+A real deployment meeting a new intrusion has no labels for it.
 The unsupervised models are the honest number, and the gap between them is
 itself a result worth reporting.
 

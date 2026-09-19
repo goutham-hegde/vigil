@@ -125,8 +125,9 @@ def render(bench: dict) -> str:
         L += _control_note(rows, split)
         L.append("")
     if any(e["supervised"] for e in bench["experiments"]):
-        L += ["† Supervised: trained on red-team labels from the training window. This is an upper bound; a "
-              "deployment facing a new intrusion has no such labels.", ""]
+        L += ["† Supervised: trained on red-team labels from the training window of the same exercise. It measures "
+              "how well a model recognises an attacker it has already seen labelled, not how well it detects a new "
+              "one; a deployment facing a new intrusion has no such labels.", ""]
     L += ["## Published results on LANL", ""]
     if bench["published"]:
         L += ["Protocols differ between papers and from this benchmark; each row notes how. These are context, "
@@ -157,13 +158,15 @@ def render_readme(bench: dict, split: str = "test") -> str:
          "| Model | " + " | ".join(c for _, c in HEADLINE) + " |", "|---|---:|---:|---:|"]
     for e in rows:
         name = e["experiment"] + (" †" if e["supervised"] else "")
+        name += f" `{json.dumps(e['params'])}`" if e["params"] else ""
         L.append(f"| {name} | " + " | ".join(_cell(e["splits"][split]["metrics"][k]) for k, _ in HEADLINE) + " |")
     L += ["", "Brackets are 95% bootstrap intervals over users. ROC-AUC is reported because published work does, but "
               "at this class imbalance it flatters everything: read AP and the alert-budget recall."]
     L += _control_note(rows, split)
     L += ["", f"Full tables, ablations and published-baseline comparisons: [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)."]
     if any(e["supervised"] for e in rows):
-        L += ["", "† Trained on red-team labels from an earlier window: an upper bound, not a deployable result."]
+        L += ["", "† Trained on red-team labels from an earlier window of the same exercise: it recognises an attacker "
+                  "it has seen labelled, not a new one. Not a deployable result."]
     return "\n".join(L)
 
 

@@ -81,7 +81,7 @@ class Context:
 
 class Experiment:
     name: ClassVar[str] = ""
-    supervised: ClassVar[bool] = False  # trained on earlier red-team labels (an upper bound, reported as such)
+    supervised: ClassVar[bool] = False  # trained on earlier red-team labels (marked † in the report)
 
     def __init__(self, params: dict | None = None):
         self.params = params or {}
